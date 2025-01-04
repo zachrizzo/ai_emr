@@ -13,38 +13,19 @@ import { AppointmentsTab } from '@/components/patient-tabs/appointments-tab'
 import { MedicationsTab } from '@/components/patient-tabs/medications-tab'
 import { ImmunizationsTab } from '@/components/patient-tabs/immunizations-tab'
 import { DocumentsTab } from '@/components/patient-tabs/documents-tab'
-import { EnhancedNotes } from '@/components/documentation/enhanced-notes'
+import { NotesTab } from '@/components/patient-tabs/notes-tab'
 import { ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { ClinicalNote } from '@/types/notes'
+import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams } from '@/types/notes'
 import { createClinicalNote, updateClinicalNote } from '@/lib/services/clinical-notes'
 import { useUser } from '@/lib/hooks/use-user'
-
-interface NotesData {
-  content: string
-  metadata: {
-    type: 'voice' | 'manual'
-    tags: string[]
-    specialty?: string
-    templateType?: string
-    diagnosis?: string[]
-    procedures?: string[]
-    vitals?: {
-      bloodPressure?: string
-      heartRate?: string
-      temperature?: string
-      respiratoryRate?: string
-      oxygenSaturation?: string
-    }
-  }
-}
 
 export default function PatientDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { user } = useUser()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [editingNote, setEditingNote] = useState<ClinicalNote | null>(null)
+  const [activeNote, setActiveNote] = useState<ClinicalNote | null>(null)
 
   useEffect(() => {
     async function loadPatient() {
@@ -72,59 +53,53 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
     loadPatient()
   }, [params.id])
 
-  const handleSaveNote = async (noteData: NotesData) => {
+  const handleCreateNote = async (noteData: CreateClinicalNoteParams) => {
     try {
       if (!user?.id || !user.organization_id) {
         throw new Error('User not authenticated or missing organization')
       }
 
-      if (editingNote) {
-        await updateClinicalNote(editingNote.id, {
-          content: noteData.content,
-          type: noteData.metadata.type,
-          tags: noteData.metadata.tags,
-          provider_id: user.id,
-          patient_id: params.id,
-          organization_id: user.organization_id,
-          specialty: noteData.metadata.specialty,
-          template_type: noteData.metadata.templateType,
-          diagnosis: noteData.metadata.diagnosis,
-          procedures: noteData.metadata.procedures,
-          vitals: noteData.metadata.vitals
-        })
-        setEditingNote(null)
-      } else {
-        await createClinicalNote({
-          content: noteData.content,
-          type: noteData.metadata.type,
-          tags: noteData.metadata.tags,
-          provider_id: user.id,
-          patient_id: params.id,
-          organization_id: user.organization_id,
-          specialty: noteData.metadata.specialty,
-          template_type: noteData.metadata.templateType,
-          diagnosis: noteData.metadata.diagnosis,
-          procedures: noteData.metadata.procedures,
-          vitals: noteData.metadata.vitals
-        })
-      }
+      await createClinicalNote({
+        ...noteData,
+        provider_id: user.id,
+        patient_id: params.id,
+        organization_id: user.organization_id,
+      })
 
       toast({
-        title: editingNote ? 'Note Updated' : 'Note Created',
+        title: 'Note Created',
         description: 'The clinical note has been saved successfully.',
       })
     } catch (error) {
-      console.error('Error saving note:', error)
+      console.error('Error creating note:', error)
       toast({
         title: 'Error',
-        description: 'Failed to save the clinical note. Please try again.',
+        description: 'Failed to create the clinical note. Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleUpdateNote = async (noteId: string, noteData: UpdateClinicalNoteParams) => {
+    try {
+      await updateClinicalNote(noteId, noteData)
+      setActiveNote(null)
+      toast({
+        title: 'Note Updated',
+        description: 'The clinical note has been updated successfully.',
+      })
+    } catch (error) {
+      console.error('Error updating note:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update the clinical note. Please try again.',
         variant: 'destructive',
       })
     }
   }
 
   const handleEditNote = (note: ClinicalNote) => {
-    setEditingNote(note)
+    setActiveNote(note)
   }
 
   if (isLoading) return <div>Loading patient details...</div>
@@ -146,8 +121,8 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
       </div>
 
       <Tabs defaultValue="personal">
-        <TabsList>
-          <TabsTrigger value="personal">Personal Information</TabsTrigger>
+        <TabsList className="grid grid-cols-8 w-full">
+          <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="medical">Medical History</TabsTrigger>
           <TabsTrigger value="lifestyle">Lifestyle</TabsTrigger>
           <TabsTrigger value="appointments">Appointments</TabsTrigger>
@@ -185,15 +160,16 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
           <DocumentsTab patientId={patient.id} />
         </TabsContent>
 
-        <TabsContent value="notes">
-          <div className="container mx-auto py-6">
-            <EnhancedNotes
-              patientId={patient.id}
-              providerId={user.id}
-              onSave={handleSaveNote}
-              initialNote={editingNote}
-            />
-          </div>
+        <TabsContent value="notes" className="space-y-4">
+          <NotesTab
+            patientId={patient.id}
+            providerId={user.id}
+            organizationId={user.organization_id}
+            activeNote={activeNote}
+            onCreateNote={handleCreateNote}
+            onUpdateNote={handleUpdateNote}
+            onEditNote={handleEditNote}
+          />
         </TabsContent>
       </Tabs>
     </div>

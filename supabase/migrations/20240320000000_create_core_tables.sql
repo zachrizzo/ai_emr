@@ -15,6 +15,18 @@ CREATE TABLE organizations (
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
 
+-- Organization Members Table
+CREATE TABLE organization_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id),
+    user_id UUID REFERENCES auth.users(id),
+    role VARCHAR(50) NOT NULL,
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    UNIQUE(organization_id, user_id)
+);
+
 -- Users Table
 CREATE TABLE users (
     id UUID REFERENCES auth.users(id) PRIMARY KEY,

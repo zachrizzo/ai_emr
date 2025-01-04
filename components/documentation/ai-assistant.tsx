@@ -1,304 +1,178 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Lightbulb, AlertCircle, CheckCircle2, Brain, Stethoscope, Pill, FileCode } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useState } from 'react'
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card } from "@/components/ui/card"
+import { toast } from "@/components/ui/use-toast"
+import { Loader2, Sparkles, Plus } from 'lucide-react'
 
 interface AIAssistantProps {
-    content: string
-    specialty: string
-    templateType: string
-    vitals: {
-        bloodPressure?: string
-        heartRate?: string
-        temperature?: string
-        respiratoryRate?: string
-        oxygenSaturation?: string
-    }
+    noteContent: string
+    onSuggestion: (suggestion: string) => void
 }
 
 interface Suggestion {
-    type: 'missing-info' | 'recommendation' | 'alert' | 'template' | 'icd10' | 'drug'
-    message: string
-    priority: 'low' | 'medium' | 'high'
-    category: string
-    code?: string
-    description?: string
-    action?: () => void
+    id: string
+    text: string
+    type: 'completion' | 'analysis' | 'summary' | 'custom'
 }
 
-// Mock ICD-10 database - In production, this would come from an API
-const ICD10_CODES = {
-    'heart attack': { code: 'I21.9', description: 'Acute myocardial infarction, unspecified' },
-    'diabetes': { code: 'E11.9', description: 'Type 2 diabetes mellitus without complications' },
-    'hypertension': { code: 'I10', description: 'Essential (primary) hypertension' },
-    'pneumonia': { code: 'J18.9', description: 'Pneumonia, unspecified organism' },
-}
-
-// Mock drug interactions database - In production, this would come from an API
-const DRUG_INTERACTIONS = {
-    'warfarin': ['aspirin', 'ibuprofen', 'naproxen'],
-    'lisinopril': ['spironolactone', 'potassium supplements'],
-    'metformin': ['contrast media', 'alcohol'],
-}
-
-export function AIAssistant({ content, specialty, templateType, vitals }: AIAssistantProps) {
+export function AIAssistant({
+    noteContent,
+    onSuggestion
+}: AIAssistantProps) {
+    const [isLoading, setIsLoading] = useState(false)
+    const [customPrompt, setCustomPrompt] = useState('')
     const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-    const [isAnalyzing, setIsAnalyzing] = useState(false)
-    const [icd10Suggestions, setIcd10Suggestions] = useState<Suggestion[]>([])
-    const [drugInteractions, setDrugInteractions] = useState<Suggestion[]>([])
 
-    useEffect(() => {
-        analyzeContent()
-    }, [content, specialty, templateType, vitals])
-
-    const findDrugInteractions = (text: string) => {
-        const interactions: Suggestion[] = []
-        const lowerText = text.toLowerCase()
-
-        Object.entries(DRUG_INTERACTIONS).forEach(([drug, interactingDrugs]) => {
-            if (lowerText.includes(drug.toLowerCase())) {
-                interactingDrugs.forEach(interactingDrug => {
-                    if (lowerText.includes(interactingDrug.toLowerCase())) {
-                        interactions.push({
-                            type: 'drug',
-                            message: `Potential interaction between ${drug} and ${interactingDrug}`,
-                            priority: 'high',
-                            category: 'drug-interaction',
-                            description: `Caution: ${drug} and ${interactingDrug} may interact.`
-                        })
-                    }
-                })
-            }
-        })
-
-        return interactions
-    }
-
-    const findICD10Codes = (text: string) => {
-        const codes: Suggestion[] = []
-        const lowerText = text.toLowerCase()
-
-        Object.entries(ICD10_CODES).forEach(([condition, details]) => {
-            if (lowerText.includes(condition)) {
-                codes.push({
-                    type: 'icd10',
-                    message: `Suggested ICD-10 code for "${condition}"`,
-                    priority: 'medium',
-                    category: 'coding',
-                    code: details.code,
-                    description: details.description
-                })
-            }
-        })
-
-        return codes
-    }
-
-    const analyzeContent = async () => {
-        setIsAnalyzing(true)
+    const generateSuggestion = async (type: Suggestion['type'], prompt?: string) => {
+        setIsLoading(true)
         try {
-            // Basic content analysis
-            const newSuggestions: Suggestion[] = []
+            const response = await fetch('/api/ai/suggest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: noteContent,
+                    type,
+                    prompt
+                }),
+            })
 
-            // Check for missing vital signs
-            if (templateType !== 'Mental Status Exam') {
-                if (!vitals.bloodPressure) {
-                    newSuggestions.push({
-                        type: 'missing-info',
-                        message: 'Blood pressure measurement is missing',
-                        priority: 'medium',
-                        category: 'vitals'
-                    })
-                }
+            if (!response.ok) throw new Error('Failed to generate suggestion')
+
+            const data = await response.json()
+            const newSuggestion: Suggestion = {
+                id: Date.now().toString(),
+                text: data.suggestion,
+                type
             }
 
-            // Check template completeness
-            if (templateType === 'SOAP') {
-                if (!content.includes('Subjective:')) {
-                    newSuggestions.push({
-                        type: 'missing-info',
-                        message: 'Subjective section is missing from SOAP note',
-                        priority: 'high',
-                        category: 'template'
-                    })
-                }
-            }
-
-            // Medical terminology suggestions
-            if (content.toLowerCase().includes('heart attack')) {
-                newSuggestions.push({
-                    type: 'recommendation',
-                    message: 'Consider using "myocardial infarction" for more precise medical terminology',
-                    priority: 'low',
-                    category: 'terminology'
-                })
-            }
-
-            // Critical value alerts
-            if (vitals.temperature && parseFloat(vitals.temperature) > 103) {
-                newSuggestions.push({
-                    type: 'alert',
-                    message: 'High fever detected. Consider immediate evaluation.',
-                    priority: 'high',
-                    category: 'vitals'
-                })
-            }
-
-            // Find ICD-10 codes and drug interactions
-            const foundICD10Codes = findICD10Codes(content)
-            const foundDrugInteractions = findDrugInteractions(content)
-
-            setIcd10Suggestions(foundICD10Codes)
-            setDrugInteractions(foundDrugInteractions)
-            setSuggestions(newSuggestions)
-
+            setSuggestions(prev => [newSuggestion, ...prev])
         } catch (error) {
-            console.error('Error analyzing content:', error)
+            console.error('Error generating suggestion:', error)
+            toast({
+                title: 'Error',
+                description: 'Failed to generate AI suggestion. Please try again.',
+                variant: 'destructive',
+            })
         } finally {
-            setIsAnalyzing(false)
+            setIsLoading(false)
+            setCustomPrompt('')
         }
     }
+
+    const handleApplySuggestion = (suggestion: Suggestion) => {
+        onSuggestion(suggestion.text)
+        toast({
+            title: 'Suggestion Applied',
+            description: 'The AI suggestion has been added to your note.',
+        })
+    }
+
+    const quickActions = [
+        {
+            label: 'Complete the current thought',
+            type: 'completion' as const,
+            description: 'AI will help complete your current sentence or paragraph'
+        },
+        {
+            label: 'Analyze symptoms',
+            type: 'analysis' as const,
+            description: 'Analyze mentioned symptoms and suggest possible conditions'
+        },
+        {
+            label: 'Summarize note',
+            type: 'summary' as const,
+            description: 'Create a concise summary of the current note'
+        }
+    ]
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
-                    AI Assistant
-                    {isAnalyzing && (
-                        <span className="text-sm text-muted-foreground ml-2">
-                            Analyzing...
-                        </span>
-                    )}
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Tabs defaultValue="suggestions">
-                    <TabsList>
-                        <TabsTrigger value="suggestions">
-                            <Lightbulb className="h-4 w-4 mr-2" />
-                            Suggestions
-                        </TabsTrigger>
-                        <TabsTrigger value="icd10">
-                            <FileCode className="h-4 w-4 mr-2" />
-                            ICD-10
-                        </TabsTrigger>
-                        <TabsTrigger value="drugs">
-                            <Pill className="h-4 w-4 mr-2" />
-                            Drug Interactions
-                        </TabsTrigger>
-                    </TabsList>
+        <div className="space-y-4">
+            {/* Quick Actions */}
+            <div className="space-y-2">
+                <h3 className="font-medium">Quick Actions</h3>
+                <div className="grid gap-2">
+                    {quickActions.map((action) => (
+                        <Button
+                            key={action.type}
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => generateSuggestion(action.type)}
+                            disabled={isLoading}
+                        >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            {action.label}
+                        </Button>
+                    ))}
+                </div>
+            </div>
 
-                    <TabsContent value="suggestions">
-                        <div className="space-y-4">
-                            {suggestions.length === 0 ? (
-                                <div className="text-center text-muted-foreground py-4">
-                                    No suggestions at this time
-                                </div>
-                            ) : (
-                                suggestions.map((suggestion, index) => (
-                                    <SuggestionCard key={index} suggestion={suggestion} />
-                                ))
-                            )}
-                        </div>
-                    </TabsContent>
+            {/* Custom Prompt */}
+            <div className="space-y-2">
+                <h3 className="font-medium">Custom Prompt</h3>
+                <div className="flex gap-2">
+                    <Textarea
+                        placeholder="Enter your prompt..."
+                        value={customPrompt}
+                        onChange={(e) => setCustomPrompt(e.target.value)}
+                        className="min-h-[80px]"
+                    />
+                    <Button
+                        variant="secondary"
+                        onClick={() => generateSuggestion('custom', customPrompt)}
+                        disabled={isLoading || !customPrompt.trim()}
+                    >
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
 
-                    <TabsContent value="icd10">
-                        <div className="space-y-4">
-                            {icd10Suggestions.length === 0 ? (
-                                <div className="text-center text-muted-foreground py-4">
-                                    No ICD-10 codes detected
-                                </div>
-                            ) : (
-                                icd10Suggestions.map((suggestion, index) => (
-                                    <SuggestionCard key={index} suggestion={suggestion} />
-                                ))
-                            )}
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="drugs">
-                        <div className="space-y-4">
-                            {drugInteractions.length === 0 ? (
-                                <div className="text-center text-muted-foreground py-4">
-                                    No drug interactions detected
-                                </div>
-                            ) : (
-                                drugInteractions.map((suggestion, index) => (
-                                    <SuggestionCard key={index} suggestion={suggestion} />
-                                ))
-                            )}
-                        </div>
-                    </TabsContent>
-                </Tabs>
-            </CardContent>
-        </Card>
-    )
-}
-
-function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'high':
-                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-            case 'medium':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-            default:
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-        }
-    }
-
-    const getIcon = (type: string) => {
-        switch (type) {
-            case 'missing-info':
-                return <AlertCircle className="h-4 w-4" />
-            case 'recommendation':
-                return <Lightbulb className="h-4 w-4" />
-            case 'alert':
-                return <AlertCircle className="h-4 w-4" />
-            case 'icd10':
-                return <FileCode className="h-4 w-4" />
-            case 'drug':
-                return <Pill className="h-4 w-4" />
-            default:
-                return <CheckCircle2 className="h-4 w-4" />
-        }
-    }
-
-    return (
-        <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <div className={`flex items-start gap-3 p-3 rounded-lg ${getPriorityColor(suggestion.priority)}`}>
-                        {getIcon(suggestion.type)}
-                        <div>
-                            <p className="font-medium">{suggestion.message}</p>
-                            {suggestion.code && (
-                                <p className="text-sm mt-1">Code: {suggestion.code}</p>
-                            )}
-                            {suggestion.description && (
-                                <p className="text-sm mt-1">{suggestion.description}</p>
-                            )}
-                            <div className="flex gap-2 mt-2">
-                                <Badge variant="secondary">
-                                    {suggestion.category}
-                                </Badge>
-                                <Badge variant="secondary">
-                                    {suggestion.type}
-                                </Badge>
-                            </div>
-                        </div>
+            {/* Suggestions */}
+            <div className="space-y-2">
+                <h3 className="font-medium">Suggestions</h3>
+                {isLoading ? (
+                    <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-6 w-6 animate-spin" />
                     </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Priority: {suggestion.priority}</p>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
+                ) : (
+                    <ScrollArea className="h-[300px]">
+                        <div className="space-y-2">
+                            {suggestions.map((suggestion) => (
+                                <Card key={suggestion.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium capitalize">
+                                                {suggestion.type}
+                                            </span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleApplySuggestion(suggestion)}
+                                            >
+                                                Apply
+                                            </Button>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                            {suggestion.text}
+                                        </p>
+                                    </div>
+                                </Card>
+                            ))}
+
+                            {suggestions.length === 0 && (
+                                <div className="text-center text-sm text-muted-foreground py-4">
+                                    No suggestions yet. Try one of the quick actions or enter a custom prompt.
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                )}
+            </div>
+        </div>
     )
 }
