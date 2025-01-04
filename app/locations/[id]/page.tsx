@@ -1,182 +1,167 @@
 'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Location } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/supabase';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { useLocations } from '@/contexts/LocationContext'
+import { Skeleton } from "@/components/ui/skeleton"
+import { EditLocationDialog } from '@/components/edit-location-dialog'
+import { toast } from '@/components/ui/use-toast'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/components/auth/auth-provider'
+import { useQueryClient } from '@tanstack/react-query'
+import { Location } from '@/types'
 
-export default function LocationDetailsPage({ params }: { params: { id: string } }) {
-  const [location, setLocation] = useState<Location | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+function LocationDetailSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-[200px]" />
+      <div className="grid grid-cols-2 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-[100px]" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  useEffect(() => {
-    const fetchLocation = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('locations')
-          .select('*')
-          .eq('id', params.id)
-          .single();
+export default function LocationDetailPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { locations, isLoading } = useLocations()
+  const { session } = useAuth()
+  const queryClient = useQueryClient()
+  const [isEditing, setIsEditing] = useState(false)
+  const locationId = params?.id as string
 
-        if (error) {
-          throw error;
-        }
+  const location = locations?.find(loc => loc.id === locationId)
 
-        setLocation(data);
-      } catch (error) {
-        console.error('Error fetching location:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch location data. Please try again.',
-          variant: 'destructive',
-        });
-        router.push('/locations'); // Redirect back to locations list
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchLocation();
-  }, [params.id, router]);
-
-  const handleUpdateLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!location) return;
-
+  const handleUpdateLocation = async (updatedLocation: Location) => {
     try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', session?.user?.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found')
+      }
+
       const { error } = await supabase
         .from('locations')
         .update({
-          name: location.name,
-          address: location.address,
-          phone_number: location.phone_number,
-          email: location.email,
-          notes: location.notes,
-          status: location.status,
-          manager_name: location.manager_name,
-          operating_hours: location.operating_hours,
+          name: updatedLocation.name,
+          address: updatedLocation.address,
+          phone_number: updatedLocation.phone_number,
+          email: updatedLocation.email,
+          status: updatedLocation.status,
         })
-        .eq('id', location.id);
+        .eq('id', locationId)
+        .eq('organization_id', userData.organization_id)
 
-      if (error) throw error;
+      if (error) throw error
 
+      queryClient.invalidateQueries({ queryKey: ['locations'] })
       toast({
-        title: 'Location Updated',
-        description: 'The location has been successfully updated.',
-      });
-      router.push('/locations');
+        title: 'Success',
+        description: 'Location updated successfully',
+      })
+      setIsEditing(false)
     } catch (error) {
-      console.error('Error updating location:', error);
+      console.error('Error updating location:', error)
       toast({
-        title: 'Update Failed',
-        description: 'An error occurred while updating the location.',
+        title: 'Error',
+        description: 'Failed to update location',
         variant: 'destructive',
-      });
+      })
     }
-  };
+  }
 
-  if (isLoading) return <div>Loading...</div>;
-  if (!location) return <div>Location not found</div>;
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6">
+            <LocationDetailSkeleton />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!location) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold">Location not found</h2>
+              <Button
+                className="mt-4"
+                onClick={() => router.push('/locations')}
+              >
+                Back to Locations
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-4">
-      <Card className="max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Edit Location</CardTitle>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{location.name}</CardTitle>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/locations')}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleUpdateLocation} className="space-y-4">
+          <div className="grid grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={location.name}
-                onChange={(e) => setLocation({ ...location, name: e.target.value })}
-                required
-              />
+              <h3 className="font-semibold mb-2">Address</h3>
+              <p className="text-gray-700">{location.address}</p>
             </div>
             <div>
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                value={location.address}
-                onChange={(e) => setLocation({ ...location, address: e.target.value })}
-                required
-              />
+              <h3 className="font-semibold mb-2">Phone Number</h3>
+              <p className="text-gray-700">{location.phone_number}</p>
             </div>
             <div>
-              <Label htmlFor="phone_number">Phone Number</Label>
-              <Input
-                id="phone_number"
-                value={location.phone_number}
-                onChange={(e) => setLocation({ ...location, phone_number: e.target.value })}
-                required
-              />
+              <h3 className="font-semibold mb-2">Email</h3>
+              <p className="text-gray-700">{location.email}</p>
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={location.email}
-                onChange={(e) => setLocation({ ...location, email: e.target.value })}
-                required
-              />
+              <h3 className="font-semibold mb-2">Status</h3>
+              <p className="text-gray-700">{location.status}</p>
             </div>
-            <div> {/* Status dropdown */}
-              <Label htmlFor="status">Status</Label>
-              <Select value={location.status} onValueChange={value => setLocation({ ...location, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="manager_name">Manager Name</Label>
-              <Input
-                id="manager_name"
-                value={location.manager_name}
-                onChange={(e) => setLocation({ ...location, manager_name: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="operating_hours">Operating Hours</Label>
-              <Textarea
-                id="operating_hours"
-                value={location.operating_hours}
-                onChange={(e) => setLocation({ ...location, operating_hours: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={location.notes}
-                onChange={(e) => setLocation({ ...location, notes: e.target.value })}
-              />
-            </div>
-
-            <div className="flex justify-between">
-              <Button type="submit">Update Location</Button>
-              <Button type="button" variant="destructive" onClick={() => router.push('/locations')}>Cancel</Button>
-            </div>
-          </form>
+          </div>
         </CardContent>
       </Card>
+
+      <EditLocationDialog
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        onUpdateLocation={handleUpdateLocation}
+        location={location}
+      />
     </div>
-  );
+  )
 }
 

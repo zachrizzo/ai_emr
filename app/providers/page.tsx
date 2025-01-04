@@ -1,22 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Provider, Location } from '@/types'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { toast } from '@/components/ui/use-toast'
-import { AddProviderDialog } from '@/components/add-provider-dialog'
-import { ConfirmDeleteModal } from '@/components/confirm-delete-modal'
-import { supabase } from '@/lib/supabase'
-import { Checkbox } from "@/components/ui/checkbox"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@/components/auth/auth-provider'
-import { Skeleton } from "@/components/ui/skeleton"
+import { useUser } from '@/lib/hooks/use-user'
 import { useProviders } from '@/contexts/ProviderContext'
 import { useLocations } from '@/contexts/LocationContext'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AddProviderDialog } from '@/components/add-provider-dialog'
+import { ConfirmDeleteModal } from '@/components/confirm-delete-modal'
+import { toast } from '@/components/ui/use-toast'
+import { supabase } from '@/lib/supabase'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
 
 function TableSkeleton() {
   return (
@@ -59,26 +59,20 @@ export default function ProvidersPage() {
   const [selectedProviders, setSelectedProviders] = useState<string[]>([])
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const router = useRouter()
-  const { session } = useAuth()
+  const { user } = useUser()
   const queryClient = useQueryClient()
   const { providers, isLoading, error } = useProviders()
   const { locations } = useLocations()
 
   const addProviderMutation = useMutation({
     mutationFn: async (newProvider: Omit<Provider, 'id'>) => {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .single()
-
-      if (!userData?.organization_id) {
+      if (!user?.organization_id) {
         throw new Error('No organization found')
       }
 
       const { data, error } = await supabase
         .from('providers')
-        .insert([{ ...newProvider, organization_id: userData.organization_id }])
+        .insert([{ ...newProvider, organization_id: user.organization_id }])
         .select()
 
       if (error) throw error
@@ -104,68 +98,67 @@ export default function ProvidersPage() {
 
   const deleteProviderMutation = useMutation({
     mutationFn: async (providerIds: string[]) => {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('organization_id')
-        .eq('id', session?.user?.id)
-        .single()
-
-      if (!userData?.organization_id) {
+      if (!user?.organization_id) {
         throw new Error('No organization found')
       }
 
-      // First verify the providers exist and aren't already deleted
-      const { data: existing, error: checkError } = await supabase
-        .from('providers')
-        .select('id')
-        .in('id', providerIds)
-        .eq('organization_id', userData.organization_id)
-        .is('deleted_at', null)
-
-      if (checkError) throw checkError
-      if (!existing?.length) throw new Error('No valid providers to delete')
-
       const { error } = await supabase
         .from('providers')
-        .delete()
-        .in('id', existing.map(p => p.id))
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', providerIds)
+        .eq('organization_id', user.organization_id)
 
       if (error) throw error
-      return existing
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['providers'] })
       setSelectedProviders([])
-      toast({
-        title: "Success",
-        description: `${data.length} provider(s) removed successfully`,
-      })
       setIsConfirmingDelete(false)
-    },
-    onError: (error: any) => {
-      console.error("Delete mutation error:", error)
       toast({
-        title: "Error",
-        description: error.message || "Failed to remove providers. Please try again.",
-        variant: "destructive",
+        title: 'Success',
+        description: 'Provider(s) deleted successfully',
+      })
+    },
+    onError: (error) => {
+      console.error('Error deleting provider:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete provider(s)',
+        variant: 'destructive',
       })
     },
   })
 
-  const handleAddProvider = (newProvider: Omit<Provider, 'id'>) => {
-    addProviderMutation.mutate(newProvider)
-  }
-
-  const handleDeleteSelectedProviders = () => {
-    if (selectedProviders.length === 0) {
+  const handleAddProvider = async (newProvider: Omit<Provider, 'id'>) => {
+    if (!user?.organization_id) {
       toast({
-        title: 'No providers selected',
-        description: 'Please select providers to delete',
-        variant: 'destructive'
+        title: 'Error',
+        description: 'No organization found',
+        variant: 'destructive',
       })
       return
     }
-    setIsConfirmingDelete(true)
+    addProviderMutation.mutate(newProvider)
+  }
+
+  const handleDeleteSelected = async () => {
+    if (!user?.organization_id) {
+      toast({
+        title: 'Error',
+        description: 'No organization found',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (selectedProviders.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'No providers selected',
+        variant: 'destructive',
+      })
+      return
+    }
+    deleteProviderMutation.mutate(selectedProviders)
   }
 
   const confirmDeleteSelectedProviders = () => {
@@ -176,6 +169,18 @@ export default function ProvidersPage() {
     setSelectedProviders(prev =>
       isChecked ? [...prev, providerId] : prev.filter(id => id !== providerId)
     )
+  }
+
+  const handleViewProvider = (providerId: string) => {
+    if (!user?.organization_id) {
+      toast({
+        title: 'Error',
+        description: 'No organization found',
+        variant: 'destructive',
+      })
+      return
+    }
+    router.push(`/providers/${providerId}`)
   }
 
   const filteredProviders = providers?.filter(provider =>
@@ -216,7 +221,7 @@ export default function ProvidersPage() {
           <div className="mb-4 flex justify-end">
             <Button
               variant="destructive"
-              onClick={handleDeleteSelectedProviders}
+              onClick={handleDeleteSelected}
               disabled={selectedProviders.length === 0}
             >
               Delete Selected
@@ -268,8 +273,8 @@ export default function ProvidersPage() {
                   <TableCell>{provider.email}</TableCell>
                   <TableCell>{locations?.find(l => l.id === provider.location_id)?.name || 'No location'}</TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => router.push(`/providers/${provider.id}`)}>
-                      Edit
+                    <Button variant="outline" size="sm" onClick={() => handleViewProvider(provider.id)}>
+                      View
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -283,7 +288,7 @@ export default function ProvidersPage() {
         onClose={() => setIsAddingProvider(false)}
         onAddProvider={handleAddProvider}
         locations={locations || []}
-        organizationId={session?.user?.organization_id || ''}
+        organizationId={user?.organization_id || ''}
       />
     </div>
   )

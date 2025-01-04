@@ -1,113 +1,175 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/components/ui/use-toast"
-import { Patient } from '@/types'
-import { PersonalInformationTab } from '@/components/patient-tabs/personal-information-tab'
-import { MedicalHistoryTab } from '@/components/patient-tabs/medical-history-tab'
-import { LifestyleTab } from '@/components/patient-tabs/lifestyle-tab'
-import { AppointmentsTab } from '@/components/patient-tabs/appointments-tab'
-import { MedicationsTab } from '@/components/patient-tabs/medications-tab'
-import { ImmunizationsTab } from '@/components/patient-tabs/immunizations-tab'
-import { DocumentsTab } from '@/components/patient-tabs/documents-tab'
-import { AssignedDocuments } from '@/components/patient-portal/assigned-documents'
-import { ArrowLeft } from 'lucide-react'
+import { useProviders } from '@/contexts/ProviderContext'
+import { useLocations } from '@/contexts/LocationContext'
+import { Skeleton } from "@/components/ui/skeleton"
+import { EditProviderDialog } from '@/components/edit-provider-dialog'
+import { toast } from '@/components/ui/use-toast'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/components/auth/auth-provider'
+import { useQueryClient } from '@tanstack/react-query'
+import { Provider } from '@/types'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+function ProviderDetailSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-[200px]" />
+      <div className="grid grid-cols-2 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-[100px]" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-export default function PatientDetailsPage({ params }: { params: { id: string } }) {
-  const [patient, setPatient] = useState<Patient | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export default function ProviderDetailPage() {
+  const params = useParams()
   const router = useRouter()
+  const { providers, isLoading } = useProviders()
+  const { locations } = useLocations()
+  const { session } = useAuth()
+  const queryClient = useQueryClient()
+  const [isEditing, setIsEditing] = useState(false)
+  const providerId = params?.id as string
 
-  useEffect(() => {
-    fetchPatient()
-  }, [params.id])
+  const provider = providers?.find(prov => prov.id === providerId)
+  const providerLocation = locations?.find(loc => loc.id === provider?.location_id)
 
-  const fetchPatient = async () => {
-    setIsLoading(true)
+  const handleUpdateProvider = async (updatedProvider: Provider) => {
     try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('id', params.id)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', session?.user?.id)
         .single()
 
+      if (!userData?.organization_id) {
+        throw new Error('No organization found')
+      }
+
+      const { error } = await supabase
+        .from('providers')
+        .update({
+          full_name: updatedProvider.full_name,
+          specialty: updatedProvider.specialty,
+          phone_number: updatedProvider.phone_number,
+          email: updatedProvider.email,
+          location_id: updatedProvider.location_id,
+          status: updatedProvider.status,
+        })
+        .eq('id', providerId)
+        .eq('organization_id', userData.organization_id)
+
       if (error) throw error
-      setPatient(data)
-    } catch (error) {
-      console.error("Error fetching patient:", error)
+
+      queryClient.invalidateQueries({ queryKey: ['providers'] })
       toast({
-        title: "Error",
-        description: "Failed to fetch patient data. Please try again.",
-        variant: "destructive",
+        title: 'Success',
+        description: 'Provider updated successfully',
       })
-    } finally {
-      setIsLoading(false)
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Error updating provider:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update provider',
+        variant: 'destructive',
+      })
     }
   }
 
-  if (isLoading) return <div>Loading...</div>
-  if (!patient) return <div>Patient not found</div>
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6">
+            <ProviderDetailSkeleton />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!provider) {
+    return (
+      <div className="container mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold">Provider not found</h2>
+              <Button
+                className="mt-4"
+                onClick={() => router.push('/providers')}
+              >
+                Back to Providers
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">{patient.full_name}</h1>
-        <Button onClick={() => router.push('/patients')} variant="outline">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Patients List
-        </Button>
-      </div>
-      <Tabs defaultValue="personal">
-        <TabsList>
-          <TabsTrigger value="personal">Personal Information</TabsTrigger>
-          <TabsTrigger value="medical">Medical History</TabsTrigger>
-          <TabsTrigger value="lifestyle">Lifestyle</TabsTrigger>
-          <TabsTrigger value="appointments">Appointments</TabsTrigger>
-          <TabsTrigger value="medications">Medications</TabsTrigger>
-          <TabsTrigger value="immunizations">Immunizations</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="personal">
-          <PersonalInformationTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="medical">
-          <MedicalHistoryTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="lifestyle">
-          <LifestyleTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="appointments">
-          <AppointmentsTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="medications">
-          <MedicationsTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="immunizations">
-          <ImmunizationsTab patientId={patient.id} />
-        </TabsContent>
-
-        <TabsContent value="documents">
-          <DocumentsTab patientId={patient.id} />
-          <div className="mt-4">
-            {/* If you have additional content, add it here */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{provider.full_name}</CardTitle>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/providers')}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
           </div>
-        </TabsContent>
-      </Tabs>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-semibold mb-2">Specialty</h3>
+              <p className="text-gray-700">{provider.specialty}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Phone Number</h3>
+              <p className="text-gray-700">{provider.phone_number}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Email</h3>
+              <p className="text-gray-700">{provider.email}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Location</h3>
+              <p className="text-gray-700">{providerLocation?.name || 'No location assigned'}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Status</h3>
+              <p className="text-gray-700">{provider.status}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="mt-8">
-        <AssignedDocuments patientId={patient.id} />
-      </div>
+      <EditProviderDialog
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        onUpdateProvider={handleUpdateProvider}
+        provider={provider}
+        locations={locations || []}
+      />
     </div>
   )
 }

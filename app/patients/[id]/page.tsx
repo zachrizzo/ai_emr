@@ -14,12 +14,30 @@ import { MedicationsTab } from '@/components/patient-tabs/medications-tab'
 import { ImmunizationsTab } from '@/components/patient-tabs/immunizations-tab'
 import { DocumentsTab } from '@/components/patient-tabs/documents-tab'
 import { EnhancedNotes } from '@/components/documentation/enhanced-notes'
-import type { NotesData } from '@/components/documentation/enhanced-notes'
 import { ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { ClinicalNote } from '@/types/notes'
 import { createClinicalNote, updateClinicalNote } from '@/lib/services/clinical-notes'
 import { useUser } from '@/lib/hooks/use-user'
+
+interface NotesData {
+  content: string
+  metadata: {
+    type: 'voice' | 'manual'
+    tags: string[]
+    specialty?: string
+    templateType?: string
+    diagnosis?: string[]
+    procedures?: string[]
+    vitals?: {
+      bloodPressure?: string
+      heartRate?: string
+      temperature?: string
+      respiratoryRate?: string
+      oxygenSaturation?: string
+    }
+  }
+}
 
 export default function PatientDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter()

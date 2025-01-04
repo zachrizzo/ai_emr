@@ -166,8 +166,8 @@ export default function LocationsPage() {
 
   const filteredLocations = locations?.filter(location =>
     location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    location.email.toLowerCase().includes(searchTerm.toLowerCase())
+    location.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    location.email?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
   if (isLoading) {
@@ -259,7 +259,7 @@ export default function LocationsPage() {
                       size="sm"
                       onClick={() => router.push(`/locations/${location.id}`)}
                     >
-                      Edit
+                      View
                     </Button>
                   </TableCell>
                 </TableRow>
