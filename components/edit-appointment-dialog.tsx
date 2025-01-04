@@ -1,175 +1,201 @@
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Appointment, Patient, Provider, Location } from '@/types'
+import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { createClient } from '@supabase/supabase-js'
+import { toast } from '@/components/ui/use-toast'
 
-interface EditAppointmentDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onEditAppointment: (appointment: Appointment) => void
-  appointment: Appointment | null
-  patients: Patient[]
-  providers: Provider[]
-  locations: Location[]
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+
+interface AppointmentDetails {
+  id: string
+  appointment_date: string
+  patient_id: string
+  provider_id: string
+  location_id: string
+  reason_for_visit: string
+  diagnosis?: string
+  follow_up_plan?: string
+  notes?: string
+  duration_minutes: number
+  status: 'scheduled' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
+  appointment_type: string
+  visit_type: 'in_person' | 'video' | 'phone'
+  organization_id: string
+  is_recurring?: boolean
+  recurring_pattern?: string
 }
 
-export function EditAppointmentDialog({
-  isOpen,
-  onClose,
-  onEditAppointment,
-  appointment,
-  patients,
-  providers,
-  locations,
-}: EditAppointmentDialogProps) {
-  const [editedAppointment, setEditedAppointment] = useState<Appointment | null>(null)
+interface EditAppointmentDialogProps {
+  appointment: AppointmentDetails
+  onUpdate: () => void
+  trigger?: React.ReactNode
+}
 
-  useEffect(() => {
-    if (appointment) {
-      setEditedAppointment(appointment)
-    }
-  }, [appointment])
+export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAppointmentDialogProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState<Partial<AppointmentDetails>>({
+    appointment_date: appointment.appointment_date ? new Date(appointment.appointment_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+    duration_minutes: appointment.duration_minutes,
+    reason_for_visit: appointment.reason_for_visit,
+    diagnosis: appointment.diagnosis,
+    follow_up_plan: appointment.follow_up_plan,
+    notes: appointment.notes,
+    status: appointment.status,
+    visit_type: appointment.visit_type,
+    appointment_type: appointment.appointment_type
+  })
 
-  if (!editedAppointment) return null
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editedAppointment) {
-      onEditAppointment(editedAppointment)
+    setIsLoading(true)
+
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          ...formData,
+          appointment_date: new Date(formData.appointment_date!).toISOString()
+        })
+        .eq('id', appointment.id)
+
+      if (error) throw error
+
+      toast({
+        title: 'Success',
+        description: 'Appointment updated successfully'
+      })
+      onUpdate()
+      setIsOpen(false)
+    } catch (error) {
+      console.error('Error updating appointment:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update appointment',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
     }
-    onClose()
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        {trigger || <Button variant="outline">Edit Appointment</Button>}
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit Appointment</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="patient">Patient</Label>
-            <Select
-              value={editedAppointment.patient_id}
-              onValueChange={(value) => setEditedAppointment(prev => ({ ...prev, patient_id: value }))}
-            >
-              <SelectTrigger id="patient">
-                <SelectValue placeholder="Select a patient" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="appointment_date">Date and Time</Label>
+              <Input
+                id="appointment_date"
+                type="datetime-local"
+                value={formData.appointment_date}
+                onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration (minutes)</Label>
+              <Input
+                id="duration"
+                type="number"
+                value={formData.duration_minutes}
+                onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) })}
+              />
+            </div>
           </div>
-          <div>
-            <Label htmlFor="provider">Provider</Label>
-            <Select
-              value={editedAppointment.provider_id}
-              onValueChange={(value) => setEditedAppointment(prev => ({ ...prev, provider_id: value }))}
-            >
-              <SelectTrigger id="provider">
-                <SelectValue placeholder="Select a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="visit_type">Visit Type</Label>
+              <Select
+                value={formData.visit_type}
+                onValueChange={(value) => setFormData({ ...formData, visit_type: value as AppointmentDetails['visit_type'] })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select visit type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in_person">In Person</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value as AppointmentDetails['status'] })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="checked_in">Checked In</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="no_show">No Show</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label htmlFor="location">Location</Label>
-            <Select
-              value={editedAppointment.location_id || 'none'}
-              onValueChange={(value) => setEditedAppointment(prev => ({ ...prev, location_id: value === 'none' ? null : value }))}
-            >
-              <SelectTrigger id="location">
-                <SelectValue placeholder="Select a location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No Location</SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="appointment_date">Date and Time</Label>
-            <Input
-              id="appointment_date"
-              type="datetime-local"              
-              value={editedAppointment.appointment_date}
-              onChange={(e) => setEditedAppointment({ ...editedAppointment, appointment_date: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="duration_minutes">Duration (minutes)</Label>
-            <Input
-              id="duration_minutes"
-              type="number"
-              value={editedAppointment.duration_minutes.toString()}
-              onChange={(e) => setEditedAppointment({ ...editedAppointment, duration_minutes: parseInt(e.target.value) })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="appointment_type">Appointment Type</Label>
-            <Input
-              id="appointment_type"
-              value={editedAppointment.appointment_type}
-              onChange={(e) => setEditedAppointment({ ...editedAppointment, appointment_type: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={editedAppointment.status}
-              onValueChange={(value) => setEditedAppointment(prev => ({ ...prev, status: value as Appointment['status'] }))}
-            >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Scheduled">Scheduled</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
-                <SelectItem value="No Show">No Show</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="reason_for_visit">Reason for Visit</Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="reason">Reason for Visit</Label>
             <Textarea
-              id="reason_for_visit"
-              value={editedAppointment.reason_for_visit}
-              onChange={(e) => setEditedAppointment({ ...editedAppointment, reason_for_visit: e.target.value })}
-              required
+              id="reason"
+              value={formData.reason_for_visit}
+              onChange={(e) => setFormData({ ...formData, reason_for_visit: e.target.value })}
             />
           </div>
-          <div>
+
+          <div className="space-y-2">
+            <Label htmlFor="diagnosis">Diagnosis</Label>
+            <Textarea
+              id="diagnosis"
+              value={formData.diagnosis}
+              onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="follow_up">Follow-up Plan</Label>
+            <Textarea
+              id="follow_up"
+              value={formData.follow_up_plan}
+              onChange={(e) => setFormData({ ...formData, follow_up_plan: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
-              value={editedAppointment.notes}
-              onChange={(e) => setEditedAppointment({ ...editedAppointment, notes: e.target.value })}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
           </div>
-          <Button type="submit">Update Appointment</Button>
+
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

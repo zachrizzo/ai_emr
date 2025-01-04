@@ -8,6 +8,10 @@ export interface ClinicalNote {
   type: "voice" | "manual" | "template";
   tags: string[];
   organization_id: string;
+  provider?: {
+    id: string;
+    full_name: string;
+  };
   metadata?: {
     specialty?: string;
     templateType?: string;

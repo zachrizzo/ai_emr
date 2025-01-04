@@ -21,7 +21,7 @@ const signupSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   organizationName: z.string().min(1, 'Organization name is required'),
   organizationType: z.string().min(1, 'Organization type is required'),
-  phone: z.string().optional(),
+  phone_number: z.string().optional(),
   address: z.string().min(1, 'Organization address is required'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -56,14 +56,14 @@ export default function SignupPage() {
       if (authError) throw authError
 
       if (authData.user) {
-        // 2. Create organization
+        // 1. Create organization
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .insert({
             name: data.organizationName,
             type: data.organizationType,
             address: data.address,
-            phone: data.phone,
+            phone_number: data.phone_number,
             email: data.email,
           })
           .select()
@@ -71,24 +71,15 @@ export default function SignupPage() {
 
         if (orgError) throw orgError
 
-        // 3. Create organization member relationship
-        const { error: memberError } = await supabase
-          .from('organization_members')
-          .insert({
-            user_id: authData.user.id,
-            organization_id: orgData.id,
-            role: 'admin',
-          })
-
-        if (memberError) throw memberError
-
-        // 4. Update user profile
+        // 2. Update user profile with organization_id
         const { error: profileError } = await supabase
           .from('users')
           .update({
             first_name: data.firstName,
             last_name: data.lastName,
-            phone: data.phone,
+            phone_number: data.phone_number,
+            organization_id: orgData.id,
+            role: 'admin'  // Since they're creating the organization, they're the admin
           })
           .eq('id', authData.user.id)
 
@@ -203,9 +194,9 @@ export default function SignupPage() {
                 <div>
                   <Input
                     type="tel"
-                    placeholder="Phone (optional)"
-                    {...register('phone')}
-                    error={errors.phone?.message}
+                    placeholder="Phone Number (optional)"
+                    {...register('phone_number')}
+                    error={errors.phone_number?.message}
                   />
                 </div>
               </div>

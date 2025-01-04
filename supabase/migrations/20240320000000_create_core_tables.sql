@@ -5,6 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    type VARCHAR(255) NOT NULL,
     address TEXT,
     phone_number VARCHAR(20),
     email VARCHAR(255),
@@ -16,19 +17,16 @@ CREATE TABLE organizations (
 
 -- Users Table
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) NOT NULL UNIQUE,
-    full_name VARCHAR(255),
+    id UUID REFERENCES auth.users(id) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
     role VARCHAR(255),
-    speciality VARCHAR(255),
+    organization_id UUID REFERENCES organizations(id),
     phone_number VARCHAR(20),
     status VARCHAR(20) DEFAULT 'active',
-    last_login TIMESTAMP WITHOUT TIME ZONE,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
-    profile_picture_url VARCHAR(255),
-    date_of_birth DATE,
-    organization_id UUID REFERENCES organizations(id)
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
 
 -- Roles Table
@@ -99,3 +97,18 @@ CREATE TRIGGER update_roles_updated_at
     BEFORE UPDATE ON roles
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Create function to handle user profile after signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, email, role, created_at, updated_at)
+    VALUES (new.id, new.email, 'user', now(), now());
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger for new user signup
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
