@@ -1,0 +1,107 @@
+# AI EMR Application Structure Notes
+
+## Application Overview
+
+- Modern Electronic Medical Records (EMR) system built with Next.js
+- Features patient management, appointments, documentation, and billing capabilities
+
+## Core Directory Structure
+
+### App Directory (`/app`)
+
+- Next.js 13+ app router structure
+- Key routes:
+  - `/dashboard` - Main application dashboard
+  - `/patients` - Patient management
+  - `/appointments` - Appointment scheduling
+  - `/schedule` - Calendar/scheduling interface
+  - `/billing` - Billing management
+  - `/documents` - Document management
+  - `/settings` - Application settings
+  - `/admin` - Administrative functions
+  - `/patient-portal` - Patient-facing portal
+  - `/providers` - Healthcare provider management
+  - `/locations` - Facility/location management
+  - `/tasks` - Task management system
+  - `/profile` - User profile management
+  - `/login` & `/signup` - Authentication routes
+
+### Components Directory (`/components`)
+
+Key components organized by functionality:
+
+1. Patient Management:
+
+   - `add-patient-dialog.tsx` (678 lines) - Comprehensive patient registration
+   - `edit-patient-dialog.tsx` - Patient information editing
+   - `patient-form.tsx` - Reusable patient form component
+
+2. Appointment Management:
+
+   - `add-appointment-dialog.tsx`
+   - `edit-appointment-dialog.tsx`
+   - `enhanced-schedule-view.tsx`
+   - `appointment-details-popup.tsx`
+
+3. Medical Records:
+
+   - `edit-medical-history-dialog.tsx`
+   - `edit-medication-dialog.tsx`
+   - `edit-immunization-dialog.tsx`
+   - `edit-lifestyle-dialog.tsx`
+
+4. Documentation:
+
+   - `/documentation` directory
+   - `submitted-document-view.tsx`
+
+5. UI Components:
+   - `/ui` directory - Reusable UI components
+   - `data-grid.tsx` - Data display component
+   - `sidebar.tsx` - Navigation sidebar
+
+### Contexts Directory (`/contexts`)
+
+Application-wide state management:
+
+- `PatientContext.tsx` - Patient data management
+- `UserContext.tsx` - User authentication/session management
+- `LocationContext.tsx` - Location/facility management
+- `ProviderContext.tsx` - Healthcare provider management
+
+## Key Features
+
+1. Patient Management
+
+   - Comprehensive patient profiles
+   - Medical history tracking
+   - Document management
+
+2. Appointment System
+
+   - Scheduling interface
+   - Calendar management
+   - Appointment details and editing
+
+3. Documentation
+
+   - Medical records
+   - Form templates
+   - Document uploads
+
+4. Administrative Features
+
+   - Provider management
+   - Location management
+   - User access control
+
+5. Billing System
+   - Patient billing management
+   - Payment processing
+
+## Technical Stack
+
+- Next.js for frontend framework
+- TypeScript for type safety
+- Context API for state management
+- Supabase for backend (indicated by migrations)
