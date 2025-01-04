@@ -7,36 +7,37 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@supabase/supabase-js'
 import { toast } from '@/components/ui/use-toast'
+import { AppointmentDetails } from '@/types'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
-interface AppointmentDetails {
-  id: string
-  appointment_date: string
-  patient_id: string
-  provider_id: string
-  location_id: string
-  reason_for_visit: string
-  diagnosis?: string
-  follow_up_plan?: string
-  notes?: string
-  duration_minutes: number
-  status: 'scheduled' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
-  appointment_type: string
-  visit_type: 'in_person' | 'video' | 'phone'
-  organization_id: string
-  is_recurring?: boolean
-  recurring_pattern?: string
-}
-
 interface EditAppointmentDialogProps {
+  isOpen: boolean
+  onClose: () => void
+  onEditAppointment: (appointment: AppointmentDetails) => void
   appointment: AppointmentDetails
-  onUpdate: () => void
-  trigger?: React.ReactNode
+  providers: Array<{ id: string; full_name: string }>
+  locations: Array<{ id: string; name: string }>
+  patients: Array<{ id: string; full_name: string }>
 }
 
-export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAppointmentDialogProps) {
-  const [isOpen, setIsOpen] = useState(false)
+const formatStatus = (status: string) => {
+  // Convert snake_case to Title Case and capitalize each word
+  return status
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+export function EditAppointmentDialog({
+  isOpen,
+  onClose,
+  onEditAppointment,
+  appointment,
+  providers,
+  locations,
+  patients
+}: EditAppointmentDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState<Partial<AppointmentDetails>>({
     appointment_date: appointment.appointment_date ? new Date(appointment.appointment_date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
@@ -47,7 +48,11 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
     notes: appointment.notes,
     status: appointment.status,
     visit_type: appointment.visit_type,
-    appointment_type: appointment.appointment_type
+    appointment_type: appointment.appointment_type,
+    patient_id: appointment.patient_id,
+    provider_id: appointment.provider_id,
+    location_id: appointment.location_id,
+    organization_id: appointment.organization_id
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,12 +60,15 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
     setIsLoading(true)
 
     try {
+      const updatedAppointment: AppointmentDetails = {
+        ...appointment,
+        ...formData,
+        appointment_date: new Date(formData.appointment_date || appointment.appointment_date).toISOString()
+      }
+
       const { error } = await supabase
         .from('appointments')
-        .update({
-          ...formData,
-          appointment_date: new Date(formData.appointment_date!).toISOString()
-        })
+        .update(updatedAppointment)
         .eq('id', appointment.id)
 
       if (error) throw error
@@ -69,8 +77,8 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
         title: 'Success',
         description: 'Appointment updated successfully'
       })
-      onUpdate()
-      setIsOpen(false)
+      onEditAppointment(updatedAppointment)
+      onClose()
     } catch (error) {
       console.error('Error updating appointment:', error)
       toast({
@@ -84,9 +92,9 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogTrigger asChild>
-        {trigger || <Button variant="outline">Edit Appointment</Button>}
+        <Button variant="outline">Edit Appointment</Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
@@ -138,7 +146,9 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
                 onValueChange={(value) => setFormData({ ...formData, status: value as AppointmentDetails['status'] })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder="Select status">
+                    {formData.status ? formatStatus(formData.status) : 'Select status'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="scheduled">Scheduled</SelectItem>
@@ -189,7 +199,7 @@ export function EditAppointmentDialog({ appointment, onUpdate, trigger }: EditAp
           </div>
 
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

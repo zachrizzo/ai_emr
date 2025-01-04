@@ -18,6 +18,14 @@ interface AddAppointmentDialogProps {
   onAddAppointment: (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => void;
 }
 
+const formatStatus = (status: string) => {
+  // Convert snake_case to Title Case and capitalize each word
+  return status
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 export function AddAppointmentDialog({
   isOpen,
   onClose,
@@ -42,10 +50,12 @@ export function AddAppointmentDialog({
     location_id: null,
     appointment_date: '',
     appointment_type: '',
-    status: 'Scheduled',
+    status: 'scheduled',
     reason_for_visit: '',
     duration_minutes: 30,
-    notes: ''
+    notes: '',
+    visit_type: 'in_person',
+    organization_id: ''
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -187,6 +197,45 @@ export function AddAppointmentDialog({
                 onChange={(e) => setNewAppointment({ ...newAppointment, duration_minutes: parseInt(e.target.value, 10) || 30 })}
                 className="w-full"
               />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="visit_type">Visit Type</Label>
+              <Select
+                value={newAppointment.visit_type}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, visit_type: value as Appointment['visit_type'] })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select visit type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in_person">In Person</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={newAppointment.status}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, status: value as Appointment['status'] })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status">
+                    {newAppointment.status ? formatStatus(newAppointment.status) : 'Select status'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="checked_in">Checked In</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="no_show">No Show</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div>

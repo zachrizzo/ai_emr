@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { Appointment } from '@/types'
+import { Appointment, AppointmentDetails } from '@/types'
 import { Card, CardContent } from "@/components/ui/card"
 import { EnhancedScheduleView } from '@/components/enhanced-schedule-view'
 import { AddAppointmentDialog } from '@/components/add-appointment-dialog'
@@ -311,7 +311,7 @@ export default function SchedulePage() {
     }
   }
 
-  const handleEditAppointment = async (updatedAppointment: Appointment) => {
+  const handleEditAppointment = async (updatedAppointment: AppointmentDetails) => {
     try {
       if (!user?.organization_id) throw new Error('No organization found for user')
 
@@ -328,17 +328,17 @@ export default function SchedulePage() {
           .eq('organization_id', user.organization_id)
           .is('deleted_at', null)
           .single(),
-        supabase.from('locations')
+        updatedAppointment.location_id ? supabase.from('locations')
           .select('id')
           .eq('id', updatedAppointment.location_id)
           .eq('organization_id', user.organization_id)
           .is('deleted_at', null)
-          .single()
+          .single() : Promise.resolve({ data: null, error: null })
       ])
 
       if (patientCheck.error) throw new Error('Selected patient is not available')
       if (providerCheck.error) throw new Error('Selected provider is not available')
-      if (locationCheck.error) throw new Error('Selected location is not available')
+      if (updatedAppointment.location_id && locationCheck.error) throw new Error('Selected location is not available')
 
       const { error } = await supabase
         .from('appointments')
@@ -448,15 +448,34 @@ export default function SchedulePage() {
         onClose={() => setIsAddAppointmentOpen(false)}
         onAddAppointment={handleAddAppointment}
       />
-      <EditAppointmentDialog
-        isOpen={isEditAppointmentOpen}
-        onClose={() => setIsEditAppointmentOpen(false)}
-        onEditAppointment={handleEditAppointment}
-        appointment={selectedAppointment}
-        providers={providers}
-        locations={locations}
-        patients={patients || []}
-      />
+      {selectedAppointment && (
+        <EditAppointmentDialog
+          isOpen={isEditAppointmentOpen}
+          onClose={() => {
+            setIsEditAppointmentOpen(false)
+            setSelectedAppointment(null)
+          }}
+          onEditAppointment={handleEditAppointment}
+          appointment={{
+            id: selectedAppointment.id,
+            appointment_date: selectedAppointment.appointment_date,
+            patient_id: selectedAppointment.patient_id,
+            provider_id: selectedAppointment.provider_id,
+            location_id: selectedAppointment.location_id,
+            reason_for_visit: selectedAppointment.reason_for_visit,
+            duration_minutes: selectedAppointment.duration_minutes,
+            status: selectedAppointment.status,
+            appointment_type: selectedAppointment.appointment_type,
+            notes: selectedAppointment.notes,
+            visit_type: selectedAppointment.visit_type || 'in_person',
+            organization_id: user?.organization_id || '',
+            is_recurring: false
+          }}
+          providers={providers || []}
+          locations={locations || []}
+          patients={patients || []}
+        />
+      )}
     </div>
   )
 }

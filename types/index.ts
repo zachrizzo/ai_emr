@@ -70,12 +70,14 @@ export interface Appointment {
   location_id: string | null;
   appointment_date: string;
   appointment_type: string;
-  status: "Scheduled" | "Completed" | "Cancelled" | "No Show";
+  status: "scheduled" | "checked_in" | "in_progress" | "completed" | "cancelled" | "no_show";
   reason_for_visit: string;
   duration_minutes: number;
   notes: string;
   created_at: string;
   updated_at: string;
+  visit_type: 'in_person' | 'video' | 'phone';
+  organization_id: string;
   patient?: {
     id: string;
     full_name: string;
@@ -214,4 +216,23 @@ export interface FormSubmission {
       description: string;
     };
   };
+}
+
+export interface AppointmentDetails {
+  id: string
+  appointment_date: string
+  patient_id: string
+  provider_id: string
+  location_id: string | null
+  reason_for_visit: string
+  diagnosis?: string
+  follow_up_plan?: string
+  notes?: string
+  duration_minutes: number
+  status: 'scheduled' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
+  appointment_type: string
+  visit_type: 'in_person' | 'video' | 'phone'
+  organization_id: string
+  is_recurring?: boolean
+  recurring_pattern?: string
 }

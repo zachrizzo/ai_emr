@@ -28,17 +28,29 @@ export function AppointmentDetailsPopup({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Scheduled':
+      case 'scheduled':
         return 'bg-blue-100 text-blue-800'
-      case 'Completed':
+      case 'completed':
         return 'bg-green-100 text-green-800'
-      case 'Cancelled':
+      case 'cancelled':
         return 'bg-red-100 text-red-800'
-      case 'No Show':
+      case 'no_show':
         return 'bg-yellow-100 text-yellow-800'
+      case 'checked_in':
+        return 'bg-purple-100 text-purple-800'
+      case 'in_progress':
+        return 'bg-indigo-100 text-indigo-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  const formatStatus = (status: string) => {
+    // Convert snake_case to Title Case and capitalize each word
+    return status
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
   }
 
   const handlePatientClick = (e: React.MouseEvent) => {
@@ -72,7 +84,7 @@ export function AppointmentDetailsPopup({
           <DialogTitle className="flex items-center justify-between">
             <span>Appointment Details</span>
             <Badge className={getStatusColor(appointment.status)}>
-              {appointment.status}
+              {formatStatus(appointment.status)}
             </Badge>
           </DialogTitle>
         </DialogHeader>
