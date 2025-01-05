@@ -210,7 +210,8 @@ export default function PatientsPage() {
   }
 
   const filteredPatients = patients?.filter(patient =>
-    patient.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (patient.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (patient.last_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   ) || []
 
   console.log('Filtered patients:', filteredPatients.length, 'Search term:', searchTerm);
@@ -316,10 +317,10 @@ export default function PatientsPage() {
                         <Checkbox
                           checked={selectedPatients.includes(patient.id)}
                           onCheckedChange={(checked) => handlePatientSelection(patient.id, checked as boolean)}
-                          aria-label={`Select ${patient.full_name}`}
+                          aria-label={`Select ${patient.first_name} ${patient.last_name}`}
                         />
                       </TableCell>
-                      <TableCell>{patient.full_name}</TableCell>
+                      <TableCell>{`${patient.first_name} ${patient.last_name}`}</TableCell>
                       <TableCell>{patient.date_of_birth}</TableCell>
                       <TableCell>{patient.gender}</TableCell>
                       <TableCell>{patient.email}</TableCell>

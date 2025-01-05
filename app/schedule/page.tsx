@@ -85,11 +85,13 @@ export default function SchedulePage() {
           organization_id,
           patients:patient_id (
             id,
-            full_name
+            first_name,
+            last_name
           ),
           providers:provider_id (
             id,
-            full_name
+            first_name,
+            last_name
           ),
           locations:location_id (
             id,
@@ -158,11 +160,13 @@ export default function SchedulePage() {
           ...rest,
           patient: patients ? {
             id: patients.id,
-            full_name: patients.full_name
+            first_name: patients.first_name,
+            last_name: patients.last_name
           } : undefined,
           provider: providers ? {
             id: providers.id,
-            full_name: providers.full_name
+            first_name: providers.first_name,
+            last_name: providers.last_name
           } : undefined,
           location: locations ? {
             id: locations.id,

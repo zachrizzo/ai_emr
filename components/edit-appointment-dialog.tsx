@@ -16,9 +16,9 @@ interface EditAppointmentDialogProps {
   onClose: () => void
   onEditAppointment: (appointment: AppointmentDetails) => void
   appointment: AppointmentDetails
-  providers: Array<{ id: string; full_name: string }>
+  providers: Array<{ id: string; first_name: string; last_name: string }>
   locations: Array<{ id: string; name: string }>
-  patients: Array<{ id: string; full_name: string }>
+  patients: Array<{ id: string; first_name: string; last_name: string }>
 }
 
 const formatStatus = (status: string) => {

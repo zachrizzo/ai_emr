@@ -42,7 +42,7 @@ export function EnhancedScheduleView({
   const providerOptions = useMemo(() => {
     return providers?.map(provider => ({
       value: provider.id,
-      label: provider.full_name
+      label: `${provider.first_name} ${provider.last_name}`
     })) || []
   }, [providers])
 
@@ -108,13 +108,14 @@ export function EnhancedScheduleView({
       'bg-pink-200 hover:bg-pink-300',
       'bg-indigo-200 hover:bg-indigo-300',
     ]
-    const index = appointmentType.length % colors.length
+    const index = (appointmentType || '').length % colors.length
     return colors[index]
   }
 
   const getPatientName = (appointment: Appointment) => {
-    if (appointment.patient && typeof appointment.patient === 'object' && 'full_name' in appointment.patient) {
-      return appointment.patient.full_name
+    if (appointment.patient && typeof appointment.patient === 'object' &&
+      'first_name' in appointment.patient && 'last_name' in appointment.patient) {
+      return `${appointment.patient.first_name} ${appointment.patient.last_name}`
     }
     return 'Unknown Patient'
   }

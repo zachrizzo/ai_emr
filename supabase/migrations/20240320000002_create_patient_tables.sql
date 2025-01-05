@@ -1,7 +1,8 @@
 -- Patients Table
 CREATE TABLE patients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    full_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
     date_of_birth DATE NOT NULL,
     gender VARCHAR(50),
     address TEXT,

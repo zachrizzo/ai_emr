@@ -1,6 +1,7 @@
 export interface Patient {
   id: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   date_of_birth: string;
   gender: string;
   address: string;
@@ -80,11 +81,13 @@ export interface Appointment {
   organization_id: string;
   patient?: {
     id: string;
-    full_name: string;
+    first_name: string;
+    last_name: string;
   };
   provider?: {
     id: string;
-    full_name: string;
+    first_name: string;
+    last_name: string;
   };
   location?: {
     id: string;
@@ -160,7 +163,8 @@ export interface PatientDocument {
 
 export interface Provider {
   id: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   specialty: string;
   phone_number?: string;

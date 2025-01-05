@@ -121,12 +121,7 @@ export function AddAppointmentDialog({
                 <SelectContent>
                   {patients?.map((patient) => (
                     <SelectItem key={patient.id} value={patient.id}>
-                      <div className="flex items-center justify-between">
-                        <span>{patient.full_name}</span>
-                        <span className="text-muted-foreground text-sm">
-                          ({format(new Date(patient.date_of_birth), 'MM/dd/yyyy')})
-                        </span>
-                      </div>
+                      {`${patient.first_name} ${patient.last_name}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -144,7 +139,9 @@ export function AddAppointmentDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {providers?.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>{provider.full_name}</SelectItem>
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {`${provider.first_name} ${provider.last_name}`}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

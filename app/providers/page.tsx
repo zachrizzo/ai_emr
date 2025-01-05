@@ -184,7 +184,7 @@ export default function ProvidersPage() {
   }
 
   const filteredProviders = providers?.filter(provider =>
-    provider.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${provider.first_name} ${provider.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     provider.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
     provider.email.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
@@ -264,10 +264,10 @@ export default function ProvidersPage() {
                     <Checkbox
                       checked={selectedProviders.includes(provider.id)}
                       onCheckedChange={(checked) => handleProviderSelection(provider.id, checked as boolean)}
-                      aria-label={`Select ${provider.full_name}`}
+                      aria-label={`Select ${provider.first_name} ${provider.last_name}`}
                     />
                   </TableCell>
-                  <TableCell>{provider.full_name}</TableCell>
+                  <TableCell>{`${provider.first_name} ${provider.last_name}`}</TableCell>
                   <TableCell>{provider.specialty}</TableCell>
                   <TableCell>{provider.phone_number}</TableCell>
                   <TableCell>{provider.email}</TableCell>

@@ -119,7 +119,7 @@ export function AppointmentDetailsPopup({
               onClick={handlePatientClick}
               className="text-base font-medium hover:text-blue-600 transition-colors"
             >
-              {appointment.patient?.full_name || 'Unknown Patient'}
+              {appointment.patient?.first_name + ' ' + appointment.patient?.last_name || 'Unknown Patient'}
             </button>
           </div>
 
@@ -133,7 +133,7 @@ export function AppointmentDetailsPopup({
               onClick={handleProviderClick}
               className="text-base font-medium hover:text-blue-600 transition-colors"
             >
-              {appointment.provider?.full_name || 'Unknown Provider'}
+              {appointment.provider?.first_name + ' ' + appointment.provider?.last_name || 'Unknown Provider'}
             </button>
           </div>
 

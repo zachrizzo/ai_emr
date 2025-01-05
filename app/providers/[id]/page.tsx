@@ -58,7 +58,8 @@ export default function ProviderDetailPage() {
       const { error } = await supabase
         .from('providers')
         .update({
-          full_name: updatedProvider.full_name,
+          first_name: updatedProvider.first_name,
+          last_name: updatedProvider.last_name,
           specialty: updatedProvider.specialty,
           phone_number: updatedProvider.phone_number,
           email: updatedProvider.email,
@@ -122,7 +123,7 @@ export default function ProviderDetailPage() {
     <div className="container mx-auto p-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{provider.full_name}</CardTitle>
+          <CardTitle>{`${provider.first_name} ${provider.last_name}`}</CardTitle>
           <div className="flex space-x-2">
             <Button
               variant="outline"
