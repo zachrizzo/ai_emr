@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Provider, Location } from '@/types'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useUser } from '@/lib/hooks/use-user'
+import { useUser } from '@/contexts/UserContext'
 import { useProviders } from '@/contexts/ProviderContext'
 import { useLocations } from '@/contexts/LocationContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
