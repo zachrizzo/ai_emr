@@ -9,27 +9,26 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 // Define the Patient interface (optional, for TypeScript)
-// /**
-//  * @typedef {Object} Patient
-//  * @property {string} id
-//  * @property {string} first_name
-//  * @property {string} last_name
-//  * @property {string} date_of_birth
-//  * @property {string} gender
-//  * @property {string} email
-//  * @property {string} phone_number
-//  * @property {string} address
-//  * @property {string} organization_id
-//  * @property {string} preferred_language
-//  * @property {string} preferred_communication
-//  */
+/**
+ * @typedef {Object} Patient
+ * @property {string} id
+ * @property {string} first_name
+ * @property {string} last_name
+ * @property {string} date_of_birth
+ * @property {string} gender
+ * @property {string} email
+ * @property {string} phone_number
+ * @property {string} address
+ * @property {string} organization_id
+ * @property {string} preferred_language
+ * @property {string} preferred_communication
+ */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log(supabaseUrl);
-console.log(supabaseServiceKey);
-
+console.log(`Supabase URL: ${supabaseUrl}`);
+console.log(`Supabase Service Key: ${supabaseServiceKey}`);
 
 if (!supabaseUrl || !supabaseServiceKey) {
     console.error('Missing Supabase URL or Service Role Key in environment variables.');
@@ -38,7 +37,6 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-
 // Utility Functions
 
 /**
@@ -46,7 +44,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * @param {Array} array - The array to select from.
  * @returns {*} - A random element.
  */
-function getRandomElement<T>(array: T[]): T {
+function getRandomElement(array) {
     return array[Math.floor(Math.random() * array.length)];
 }
 
@@ -56,7 +54,7 @@ function getRandomElement<T>(array: T[]): T {
  * @param {number} max
  * @returns {number}
  */
-function getRandomInt(min: number, max: number): number {
+function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -65,7 +63,7 @@ function getRandomInt(min: number, max: number): number {
  * @param {number} days
  * @returns {Date}
  */
-function getRandomFutureDate(days: number): Date {
+function getRandomFutureDate(days) {
     const today = new Date();
     const futureDate = new Date(today);
     futureDate.setDate(today.getDate() + getRandomInt(1, days));
@@ -77,7 +75,7 @@ function getRandomFutureDate(days: number): Date {
  * Generates a random phone number in the format (555) 123-4567
  * @returns {string}
  */
-function generateRandomPhoneNumber(): string {
+function generateRandomPhoneNumber() {
     const areaCode = '555'; // Keeping area code consistent for simplicity
     const firstPart = getRandomInt(100, 999);
     const secondPart = getRandomInt(1000, 9999);
@@ -89,7 +87,7 @@ function generateRandomPhoneNumber(): string {
  * @param {number} streetNumber
  * @returns {string}
  */
-function generateRandomAddress(streetNumber: number): string {
+function generateRandomAddress(streetNumber) {
     const streetNames = ['Patient St', 'Health Ave', 'Medical Blvd', 'Care Way', 'Wellness Pkwy'];
     const street = getRandomElement(streetNames);
     const zip = 85000 + getRandomInt(0, 99);
@@ -104,147 +102,15 @@ function generateRandomAddress(streetNumber: number): string {
  * @param {string} lastName
  * @returns {string}
  */
-function generateRandomEmail(firstName: string, lastName: string): string {
+function generateRandomEmail(firstName, lastName) {
     const domains = ['email.com', 'cilwamedical.com', 'healthcare.org'];
     return `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${getRandomElement(domains)}`;
 }
 
-/**
- * Generates a random password adhering to typical password policies.
- * @returns {string}
- */
-function generateRandomPassword() {
-    // Simple password generator: 8 characters, at least one letter and one number
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
-    let password = '';
-    for (let i = 0; i < 10; i++) {
-        password += chars.charAt(getRandomInt(0, chars.length - 1));
-    }
-    return password;
-}
+// Note: Removed password generation function since we are using a fixed password.
 
 // Add interfaces for our data types
-interface Patient {
-    id: string;
-    first_name: string;
-    last_name: string;
-    date_of_birth: string;
-    gender: string;
-    email: string;
-    phone_number: string;
-    address: string;
-    organization_id: string;
-    preferred_language: string;
-    preferred_communication: string;
-    cultural_considerations?: string | null;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface Appointment {
-    organization_id: string;
-    patient_id: string;
-    provider_id: string;
-    location_id: string;
-    appointment_date: Date;
-    duration_minutes: number;
-    status: string;
-    reason_for_visit: string;
-    appointment_type: string;
-    visit_type: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface EmergencyContact {
-    patient_id: string;
-    name: string;
-    relationship: string;
-    phone_number: string;
-    organization_id: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface ClinicalNote {
-    patient_id: string;
-    provider_id: string;
-    appointment_id: string;
-    organization_id: string;
-    content: string;
-    type: string;
-    status: string;
-    template_id: string | null;
-    metadata: Record<string, any>;
-    tags: string[];
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface NoteSection {
-    note_id: string;
-    section_type: 'subjective' | 'objective' | 'assessment' | 'plan';
-    title: string;
-    content: { content: string };
-    order_index: number;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface NoteComment {
-    note_id: string;
-    user_id: string;
-    content: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface Provider {
-    id: string;
-    first_name: string;
-    last_name: string;
-    specialty: string;
-    phone_number: string;
-    email: string;
-    organization_id: string;
-    location_id: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface Location {
-    id: string;
-    name: string;
-    address: string;
-    phone_number: string;
-    email: string;
-    organization_id: string;
-    status: string;
-    manager_name: string;
-    operating_hours: string;
-    timezone: string;
-    capacity: number;
-    is_primary: boolean;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface NoteTemplate {
-    id: string;
-    name: string;
-    content: string;
-    specialty: string;
-    category: string;
-    organization_id: string;
-    created_by: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-interface SupabaseUser {
-    id: string;
-    email?: string;
-}
+// (TypeScript interfaces are optional and can be removed if using plain JavaScript)
 
 // Main Seed Function
 async function seed() {
@@ -252,6 +118,9 @@ async function seed() {
         console.log('Starting data seeding...');
 
         // 1. Check if the user exists
+        const targetEmail = 'zachcilwa@gmail.com'; // Define the target email
+        const targetPassword = 'Zach013074!'; // Define the target password
+
         const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
 
         if (listError) {
@@ -259,72 +128,49 @@ async function seed() {
         }
 
         // 2. If user exists, delete their data and then delete the user
-        const existingUser = existingUsers.users.find((user: SupabaseUser) => user.email === 'zachcilwa@gmail.com');
+        const existingUser = existingUsers.users.find((user) => user.email === targetEmail);
         if (existingUser) {
-            // Delete user's data from all related tables in the correct order
-            const { data: userOrgs } = await supabase
+            console.log(`Existing user found: ${targetEmail}. Proceeding to delete their data.`);
+
+            // Fetch all organization memberships for the user
+            const { data: userOrgs, error: userOrgsError } = await supabase
                 .from('organization_members')
                 .select('organization_id')
                 .eq('user_id', existingUser.id);
 
-            if (userOrgs) {
+            if (userOrgsError) {
+                throw new Error(`Error fetching user's organizations: ${userOrgsError.message}`);
+            }
+
+            if (userOrgs && userOrgs.length > 0) {
                 for (const org of userOrgs) {
-                    // Delete all data related to the organization
-                    const { error: notesError } = await supabase
-                        .from('clinical_notes')
-                        .delete()
-                        .eq('organization_id', org.organization_id);
+                    const organizationId = org.organization_id;
 
-                    const { error: appointmentsError } = await supabase
-                        .from('appointments')
-                        .delete()
-                        .eq('organization_id', org.organization_id);
+                    // Define the order of deletion to maintain referential integrity
+                    const deleteOperations = [
+                        supabase.from('note_comments').delete().eq('organization_id', organizationId),
+                        supabase.from('note_sections').delete().eq('organization_id', organizationId),
+                        supabase.from('clinical_notes').delete().eq('organization_id', organizationId),
+                        supabase.from('appointments').delete().eq('organization_id', organizationId),
+                        supabase.from('emergency_contacts').delete().eq('organization_id', organizationId),
+                        supabase.from('patients').delete().eq('organization_id', organizationId),
+                        supabase.from('providers').delete().eq('organization_id', organizationId),
+                        supabase.from('note_templates').delete().eq('organization_id', organizationId),
+                        supabase.from('locations').delete().eq('organization_id', organizationId),
+                        supabase.from('organizations').delete().eq('id', organizationId),
+                        supabase.from('users').delete().eq('id', existingUser.id),
+                        supabase.from('organization_members').delete().eq('user_id', existingUser.id),
+                    ];
 
-                    const { error: patientsError } = await supabase
-                        .from('patients')
-                        .delete()
-                        .eq('organization_id', org.organization_id);
-
-                    const { error: providersError } = await supabase
-                        .from('providers')
-                        .delete()
-                        .eq('organization_id', org.organization_id);
-
-                    const { error: locationsError } = await supabase
-                        .from('locations')
-                        .delete()
-                        .eq('organization_id', org.organization_id);
-
-                    // Delete the organization itself
-                    const { error: orgError } = await supabase
-                        .from('organizations')
-                        .delete()
-                        .eq('id', org.organization_id);
-
-                    if (orgError && !orgError.message.includes('no rows')) {
-                        console.warn(`Warning: Error deleting organization: ${orgError.message}`);
+                    for (const operation of deleteOperations) {
+                        const { error } = await operation;
+                        if (error && !error.message.includes('no rows')) {
+                            console.warn(`Warning: Error during deletion: ${error.message}`);
+                        }
                     }
+
+                    console.log(`Deleted data for organization ID: ${organizationId}`);
                 }
-            }
-
-            // Delete user's organization memberships
-            const { error: membershipError } = await supabase
-                .from('organization_members')
-                .delete()
-                .eq('user_id', existingUser.id);
-
-            if (membershipError && !membershipError.message.includes('no rows')) {
-                console.warn(`Warning: Error deleting organization memberships: ${membershipError.message}`);
-            }
-
-            // Delete the user's profile
-            const { error: profileError } = await supabase
-                .from('users')
-                .delete()
-                .eq('id', existingUser.id);
-
-            if (profileError && !profileError.message.includes('no rows')) {
-                console.warn(`Warning: Error deleting user profile: ${profileError.message}`);
             }
 
             // Finally, delete the user
@@ -335,16 +181,15 @@ async function seed() {
             console.log(`Deleted existing user with ID: ${existingUser.id}`);
         }
 
-        // 3. Create a new user
-        const newPassword = generateRandomPassword(); // Generate a random password
+        // 3. Create a new user with fixed credentials
         const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-            email: 'zachcilwa@gmail.com',
-            password: newPassword, // Use the randomly generated password
+            email: targetEmail,
+            password: targetPassword, // Use the specified password
             email_confirm: true,
             user_metadata: {
                 first_name: 'Zach',
                 last_name: 'Cilwa',
-                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=zachcilwa${getRandomInt(1, 1000)}`, // Adding randomness to avatar URL
+                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=zachcilwa`, // Static avatar URL
             },
         });
 
@@ -353,7 +198,7 @@ async function seed() {
         }
 
         console.log('User created successfully:', userData);
-        console.log(`Generated Password for user: ${newPassword}`); // **Note:** In production, handle passwords securely.
+        console.log(`Assigned Password for user: ${targetPassword}`); // **Note:** In production, handle passwords securely.
 
         const userId = userData.user.id;
 
@@ -362,7 +207,7 @@ async function seed() {
             .from('organizations')
             .insert([{
                 name: 'Cilwa Medical Center',
-                type: getRandomElement(['hospital', 'clinic', 'urgent_care']),
+                type: 'clinic', // Fixed type for consistency
                 address: '123 Healthcare Ave, Phoenix, AZ 85001', // Static for simplicity
                 phone_number: generateRandomPhoneNumber(),
                 email: 'info@cilwamedical.com',
@@ -386,10 +231,10 @@ async function seed() {
             .from('users')
             .upsert([{
                 id: userId,
-                email: 'zachcilwa@gmail.com',
+                email: targetEmail,
                 first_name: 'Zach',
                 last_name: 'Cilwa',
-                role: getRandomElement(['provider', 'admin', 'staff']),
+                role: 'admin', // Assigning a fixed role since we have only one user
                 organization_id: organizationId,
                 phone_number: generateRandomPhoneNumber(),
                 created_at: new Date(),
@@ -405,14 +250,14 @@ async function seed() {
         console.log('User profile created/updated successfully.');
 
         // 6. Associate the user with the organization as an admin
-        // First, remove any existing memberships for this user
+        // Remove any existing memberships for this user
         const { error: deleteMembershipError } = await supabase
             .from('organization_members')
             .delete()
             .eq('user_id', userId);
 
-        if (deleteMembershipError) {
-            throw new Error(`Error deleting existing organization memberships: ${deleteMembershipError.message}`);
+        if (deleteMembershipError && !deleteMembershipError.message.includes('no rows')) {
+            console.warn(`Warning: Error deleting existing organization memberships: ${deleteMembershipError.message}`);
         }
 
         // Then, add the user as an admin member
@@ -447,15 +292,15 @@ async function seed() {
             operating_hours: 'Mon-Fri: 8:00 AM - 5:00 PM',
             timezone: 'America/Phoenix',
             capacity: getRandomElement([100, 200, 300, 400, 500]),
-            is_primary: name === 'Main Hospital' ? true : false,
+            is_primary: name === 'Main Hospital', // Only 'Main Hospital' is primary
             created_at: new Date(),
             updated_at: new Date(),
-        })) as Location[];
+        }));
 
         const { data: createdLocations, error: locError } = await supabase
             .from('locations')
             .insert(locations)
-            .select() as { data: Location[] | null, error: any };
+            .select();
 
         if (locError) {
             throw new Error(`Error creating locations: ${locError.message}`);
@@ -481,7 +326,7 @@ async function seed() {
             const location = getRandomElement(createdLocations);
             const email = generateRandomEmail(firstName, lastName);
 
-            // Create provider profile using the main user's ID
+            // Providers are linked to the main user
             providers.push({
                 first_name: firstName,
                 last_name: lastName,
@@ -490,7 +335,7 @@ async function seed() {
                 email: email,
                 organization_id: organizationId,
                 location_id: location.id,
-                user_id: userId, // Use the main user's ID for all providers
+                user_id: userId, // Associate with the main user
                 created_at: new Date(),
                 updated_at: new Date(),
             });
@@ -568,13 +413,13 @@ async function seed() {
         const appointmentTypes = ['routine', 'urgent', 'follow_up', 'specialist', 'procedure'];
         const visitTypes = ['in_person', 'video', 'phone'];
 
-        const appointments: Appointment[] = [];
+        const appointments = [];
 
-        createdPatients.forEach((patient: any) => {
+        createdPatients.forEach((patient) => {
             const numberOfAppointments = getRandomInt(1, 5);
             for (let i = 0; i < numberOfAppointments; i++) {
-                const provider = getRandomElement(createdProviders) as Provider;
-                const location = getRandomElement(createdLocations) as Location;
+                const provider = getRandomElement(createdProviders);
+                const location = getRandomElement(createdLocations);
                 const appointmentDate = getRandomFutureDate(60);
                 const duration = getRandomElement([15, 30, 45, 60]);
                 const status = getRandomElement(appointmentStatuses);
@@ -612,9 +457,9 @@ async function seed() {
 
         // 11. Create emergency contacts for each patient
         const relationships = ['Spouse', 'Parent', 'Sibling', 'Child', 'Friend', 'Guardian'];
-        const emergencyContacts: EmergencyContact[] = [];
+        const emergencyContacts = [];
 
-        createdPatients.forEach((patient: any) => {
+        createdPatients.forEach((patient) => {
             const hasEmergencyContact = Math.random() < 0.8;
             if (hasEmergencyContact) {
                 const relationship = getRandomElement(relationships);
@@ -700,12 +545,12 @@ async function seed() {
         console.log('Note templates created successfully:', createdTemplates);
 
         // 13. Create clinical notes for appointments
-        const clinicalNotes: ClinicalNote[] = [];
+        const clinicalNotes = [];
 
-        createdAppointments.forEach((appointment: any) => {
+        createdAppointments.forEach((appointment) => {
             const useTemplate = Math.random() < 0.8;
-            const template = useTemplate ? getRandomElement(createdTemplates) as NoteTemplate : null;
-            const type = useTemplate ? 'template' : 'manual';
+            const template = useTemplate ? getRandomElement(createdTemplates) : null;
+            const type = useTemplate && template ? 'template' : 'manual';
             const status = getRandomElement(['draft', 'final', 'signed']);
             const visitType = appointment.visit_type;
 
@@ -765,10 +610,10 @@ async function seed() {
             'plan': ['Plan includes continued monitoring.', 'Medication adjustment is necessary.', 'Follow-up scheduled in two weeks.', 'Referral to a specialist is recommended.'],
         };
 
-        const noteSections: NoteSection[] = [];
+        const noteSections = [];
 
-        createdClinicalNotes.forEach((note: any) => {
-            (sectionTypes as Array<'subjective' | 'objective' | 'assessment' | 'plan'>).forEach((type, index) => {
+        createdClinicalNotes.forEach((note) => {
+            sectionTypes.forEach((type, index) => {
                 const content = `${getRandomElement(sectionContents[type])}`;
                 noteSections.push({
                     note_id: note.id,
@@ -807,9 +652,9 @@ async function seed() {
             'Schedule imaging studies for further evaluation.',
         ];
 
-        const noteComments: NoteComment[] = [];
+        const noteComments = [];
 
-        createdClinicalNotes.forEach((note: any) => {
+        createdClinicalNotes.forEach((note) => {
             const hasComments = Math.random() < 0.5;
             if (hasComments) {
                 const numberOfComments = getRandomInt(1, 3);

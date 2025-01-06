@@ -42,11 +42,20 @@ export function EditProviderDialog({ isOpen, onClose, onUpdateProvider, provider
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <Label htmlFor="full_name">Full Name</Label>
+                        <Label htmlFor="first_name">First Name</Label>
                         <Input
-                            id="full_name"
-                            value={editedProvider.full_name}
-                            onChange={(e) => setEditedProvider({ ...editedProvider, full_name: e.target.value })}
+                            id="first_name"
+                            value={editedProvider.first_name}
+                            onChange={(e) => setEditedProvider({ ...editedProvider, first_name: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="last_name">Last Name</Label>
+                        <Input
+                            id="last_name"
+                            value={editedProvider.last_name}
+                            onChange={(e) => setEditedProvider({ ...editedProvider, last_name: e.target.value })}
                             required
                         />
                     </div>

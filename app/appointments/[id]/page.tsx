@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
 import { EditAppointmentDialog } from '@/components/edit-appointment-dialog'
 import { RecurringAppointmentForm } from '@/components/recurring-appointment-form'
+import { useProviders } from '@/contexts/ProviderContext'
+import { useLocations } from '@/contexts/LocationContext'
+import { usePatients } from '@/contexts/PatientContext'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
@@ -33,6 +36,10 @@ export default function AppointmentPage({ params }: { params: { id: string } }) 
   const [appointment, setAppointment] = useState<AppointmentDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const { providers } = useProviders()
+  const { locations } = useLocations()
+  const { patients } = usePatients()
 
   useEffect(() => {
     fetchAppointment()
@@ -186,9 +193,20 @@ export default function AppointmentPage({ params }: { params: { id: string } }) 
           </div>
           <div className="mt-6 flex gap-4">
             <EditAppointmentDialog
+              isOpen={isEditing}
+              onClose={() => setIsEditing(false)}
               appointment={appointment}
-              onUpdate={fetchAppointment}
+              onEditAppointment={fetchAppointment}
+              providers={providers || []}
+              locations={locations || []}
+              patients={patients || []}
             />
+            <Button
+              variant="outline"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
             <Button
               variant="destructive"
               onClick={handleCancelAppointment}

@@ -109,7 +109,7 @@ export function AddAppointmentDialog({
                 <SelectTrigger className="w-full">
                   {selectedPatient ? (
                     <div className="flex items-center justify-between">
-                      <span>{selectedPatient.full_name}</span>
+                      <span>{selectedPatient.first_name + ' ' + selectedPatient.last_name}</span>
                       <span className="text-muted-foreground text-sm">
                         ({format(new Date(selectedPatient.date_of_birth), 'MM/dd/yyyy')})
                       </span>

@@ -9,7 +9,8 @@ CREATE TABLE providers (
     location_id UUID REFERENCES locations(id),
     notes TEXT,
     organization_id UUID REFERENCES organizations(id),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
 
 -- Appointments Table

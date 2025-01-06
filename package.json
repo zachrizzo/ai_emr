@@ -12,8 +12,9 @@
     "test:coverage": "jest --coverage",
     "docker:start": "open -a Docker",
     "supabase:start": "npm run docker:start && sleep 20 && supabase start",
-    "supabase:stop": "supabase stop",
-    "dev:local": "supabase start && next dev"
+    "supabase:stop": "supabase stop || true",
+    "dev:local": "supabase start && next dev",
+    "db:reset": "npm run supabase:start && sleep 10 && supabase db reset && sleep 5 && supabase stop && sleep 5 && supabase start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

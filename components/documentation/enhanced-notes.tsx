@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import TipTapEditor from '@/components/documentation/tiptap-editor'
+import { TipTapEditor } from '@/components/documentation/tiptap-editor'
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { ClinicalNote } from '@/types/notes'

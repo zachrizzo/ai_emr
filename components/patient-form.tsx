@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 
 interface Patient {
-  full_name: string
+  first_name: string
+  last_name: string
   date_of_birth: string
   gender: string
   address: string
@@ -19,11 +20,12 @@ interface Patient {
   preferred_communication: string
   cultural_considerations: string
   organization_id: string
+  created_at: string
 }
 
 interface PatientFormProps {
   initialPatient?: Patient
-  onSubmit: (patient: Patient) => void
+  onSubmit: (patient: Omit<Patient, 'id'>) => void
   onCancel: () => void
   organizationId: string
 }
@@ -31,7 +33,8 @@ interface PatientFormProps {
 export function PatientForm({ initialPatient, onSubmit, onCancel, organizationId }: PatientFormProps) {
   const [patient, setPatient] = useState<Patient>(
     initialPatient || {
-      full_name: '',
+      first_name: '',
+      last_name: '',
       date_of_birth: '',
       gender: '',
       address: '',
@@ -41,6 +44,7 @@ export function PatientForm({ initialPatient, onSubmit, onCancel, organizationId
       preferred_communication: '',
       cultural_considerations: '',
       organization_id: organizationId,
+      created_at: new Date().toISOString()
     }
   )
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
@@ -50,7 +54,8 @@ export function PatientForm({ initialPatient, onSubmit, onCancel, organizationId
     const newErrors: { [key: string]: string } = {}
 
     // Validate required fields
-    if (!patient.full_name) newErrors.full_name = "Full name is required"
+    if (!patient.first_name) newErrors.first_name = "First name is required"
+    if (!patient.last_name) newErrors.last_name = "Last name is required"
     if (!patient.date_of_birth) newErrors.date_of_birth = "Date of birth is required"
     if (!patient.gender) newErrors.gender = "Gender is required"
     if (!patient.phone_number) newErrors.phone_number = "Phone number is required"
@@ -73,15 +78,27 @@ export function PatientForm({ initialPatient, onSubmit, onCancel, organizationId
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="full_name">Full Name *</Label>
+        <Label htmlFor="first_name">First Name *</Label>
         <Input
-          id="full_name"
-          value={patient.full_name}
-          onChange={(e) => setPatient({ ...patient, full_name: e.target.value })}
+          id="first_name"
+          value={patient.first_name}
+          onChange={(e) => setPatient({ ...patient, first_name: e.target.value })}
           required
-          className={errors.full_name ? 'border-red-500' : ''}
+          className={errors.first_name ? 'border-red-500' : ''}
         />
-        {errors.full_name && <p className="text-red-500 text-sm">{errors.full_name}</p>}
+        {errors.first_name && <p className="text-red-500 text-sm">{errors.first_name}</p>}
+      </div>
+
+      <div>
+        <Label htmlFor="last_name">Last Name *</Label>
+        <Input
+          id="last_name"
+          value={patient.last_name}
+          onChange={(e) => setPatient({ ...patient, last_name: e.target.value })}
+          required
+          className={errors.last_name ? 'border-red-500' : ''}
+        />
+        {errors.last_name && <p className="text-red-500 text-sm">{errors.last_name}</p>}
       </div>
 
       <div>

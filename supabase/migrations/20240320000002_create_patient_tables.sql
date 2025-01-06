@@ -93,7 +93,8 @@ CREATE TABLE lifestyle (
 );
 
 -- Create indexes
-CREATE INDEX idx_patients_full_name ON patients(full_name);
+CREATE INDEX idx_patients_first_name ON patients(first_name);
+CREATE INDEX idx_patients_last_name ON patients(last_name);
 CREATE INDEX idx_medical_history_patient ON medical_history(patient_id);
 CREATE INDEX idx_medications_patient ON medications(patient_id);
 CREATE INDEX idx_emergency_contacts_patient ON emergency_contacts(patient_id);

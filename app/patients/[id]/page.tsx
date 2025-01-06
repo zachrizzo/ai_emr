@@ -82,7 +82,8 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
 
   const handleUpdateNote = async (noteId: string, noteData: UpdateClinicalNoteParams) => {
     try {
-      await updateClinicalNote(noteId, noteData)
+      if (!user) return;
+      await updateClinicalNote(noteId, user.organization_id, noteData)
       setActiveNote(null)
       toast({
         title: 'Note Updated',
@@ -98,7 +99,7 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
     }
   }
 
-  const handleEditNote = (note: ClinicalNote) => {
+  const handleEditNote = (note: ClinicalNote | null) => {
     setActiveNote(note)
   }
 

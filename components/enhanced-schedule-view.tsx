@@ -294,20 +294,22 @@ export function EnhancedScheduleView({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="w-[200px]">
+          <div className="flex-1 min-w-[250px] max-w-[400px]">
             <MultiSelect
               options={providerOptions}
               selected={selectedProviders}
               onChange={onSelectProviders}
-              placeholder="Select provider(s)"
+              placeholder="Filter by provider(s)"
+              className="w-full"
             />
           </div>
-          <div className="w-[200px]">
+          <div className="flex-1 min-w-[250px] max-w-[400px]">
             <MultiSelect
               options={locationOptions}
               selected={selectedLocations}
               onChange={onSelectLocations}
-              placeholder="Select location(s)"
+              placeholder="Filter by location(s)"
+              className="w-full"
             />
           </div>
         </div>

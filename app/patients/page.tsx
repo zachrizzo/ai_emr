@@ -123,7 +123,7 @@ export default function PatientsPage() {
       return data[0]
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['patients'])
+      queryClient.invalidateQueries({ queryKey: ['patients'] })
       setIsAddingPatient(false)
       toast({
         title: "Success",
@@ -170,8 +170,8 @@ export default function PatientsPage() {
       return existing;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries(['patients']);
-      setSelectedPatients([]);
+      queryClient.invalidateQueries({ queryKey: ['patients'] })
+      setSelectedPatients([])
       toast({
         title: "Success",
         description: `${data.length} patient(s) removed successfully`,
@@ -255,7 +255,7 @@ export default function PatientsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <PatientTableSkeleton />
+            <TableSkeleton />
           ) : (
             <>
               <div className="mb-4 flex justify-end space-x-2">

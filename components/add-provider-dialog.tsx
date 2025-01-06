@@ -1,10 +1,11 @@
+'use client'
+
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Provider, Location } from '@/types'
 
 interface AddProviderDialogProps {
@@ -17,12 +18,13 @@ interface AddProviderDialogProps {
 
 export function AddProviderDialog({ isOpen, onClose, onAddProvider, locations, organizationId }: AddProviderDialogProps) {
   const [newProvider, setNewProvider] = useState<Omit<Provider, 'id'>>({
-    full_name: '',
+    first_name: '',
+    last_name: '',
     specialty: '',
     phone_number: '',
     email: '',
     location_id: '',
-    notes: '',
+    status: 'Active',
     organization_id: organizationId
   })
 
@@ -30,7 +32,7 @@ export function AddProviderDialog({ isOpen, onClose, onAddProvider, locations, o
     e.preventDefault()
     const providerToAdd = {
       ...newProvider,
-      location_id: newProvider.location_id === 'none' ? null : newProvider.location_id
+      location_id: newProvider.location_id === 'none' ? undefined : newProvider.location_id
     }
     onAddProvider(providerToAdd)
     onClose()
@@ -44,11 +46,20 @@ export function AddProviderDialog({ isOpen, onClose, onAddProvider, locations, o
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="full_name">Full Name</Label>
+            <Label htmlFor="first_name">First Name</Label>
             <Input
-              id="full_name"
-              value={newProvider.full_name}
-              onChange={(e) => setNewProvider({ ...newProvider, full_name: e.target.value })}
+              id="first_name"
+              value={newProvider.first_name}
+              onChange={(e) => setNewProvider({ ...newProvider, first_name: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="last_name">Last Name</Label>
+            <Input
+              id="last_name"
+              value={newProvider.last_name}
+              onChange={(e) => setNewProvider({ ...newProvider, last_name: e.target.value })}
               required
             />
           </div>
@@ -98,12 +109,19 @@ export function AddProviderDialog({ isOpen, onClose, onAddProvider, locations, o
             </Select>
           </div>
           <div>
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={newProvider.notes}
-              onChange={(e) => setNewProvider({ ...newProvider, notes: e.target.value })}
-            />
+            <Label htmlFor="status">Status</Label>
+            <Select
+              value={newProvider.status}
+              onValueChange={(value: "Active" | "Inactive") => setNewProvider({ ...newProvider, status: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button type="submit">Add Provider</Button>
         </form>
