@@ -8,22 +8,6 @@ const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
-// Define the Patient interface (optional, for TypeScript)
-/**
- * @typedef {Object} Patient
- * @property {string} id
- * @property {string} first_name
- * @property {string} last_name
- * @property {string} date_of_birth
- * @property {string} gender
- * @property {string} email
- * @property {string} phone_number
- * @property {string} address
- * @property {string} organization_id
- * @property {string} preferred_language
- * @property {string} preferred_communication
- */
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -107,11 +91,6 @@ function generateRandomEmail(firstName, lastName) {
     return `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${getRandomElement(domains)}`;
 }
 
-// Note: Removed password generation function since we are using a fixed password.
-
-// Add interfaces for our data types
-// (TypeScript interfaces are optional and can be removed if using plain JavaScript)
-
 // Main Seed Function
 async function seed() {
     try {
@@ -128,7 +107,7 @@ async function seed() {
         }
 
         // 2. If user exists, delete their data and then delete the user
-        const existingUser = existingUsers.users.find((user) => user.email === targetEmail);
+        const existingUser = existingUsers.users.find(user => user.email === targetEmail);
         if (existingUser) {
             console.log(`Existing user found: ${targetEmail}. Proceeding to delete their data.`);
 
@@ -184,12 +163,12 @@ async function seed() {
         // 3. Create a new user with fixed credentials
         const { data: userData, error: createError } = await supabase.auth.admin.createUser({
             email: targetEmail,
-            password: targetPassword, // Use the specified password
+            password: targetPassword,
             email_confirm: true,
             user_metadata: {
                 first_name: 'Zach',
                 last_name: 'Cilwa',
-                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=zachcilwa`, // Static avatar URL
+                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=zachcilwa`,
             },
         });
 
@@ -198,7 +177,7 @@ async function seed() {
         }
 
         console.log('User created successfully:', userData);
-        console.log(`Assigned Password for user: ${targetPassword}`); // **Note:** In production, handle passwords securely.
+        console.log(`Assigned Password for user: ${targetPassword}`);
 
         const userId = userData.user.id;
 
@@ -207,8 +186,8 @@ async function seed() {
             .from('organizations')
             .insert([{
                 name: 'Cilwa Medical Center',
-                type: 'clinic', // Fixed type for consistency
-                address: '123 Healthcare Ave, Phoenix, AZ 85001', // Static for simplicity
+                type: 'clinic',
+                address: '123 Healthcare Ave, Phoenix, AZ 85001',
                 phone_number: generateRandomPhoneNumber(),
                 email: 'info@cilwamedical.com',
                 website: 'www.cilwamedical.com',
@@ -234,7 +213,7 @@ async function seed() {
                 email: targetEmail,
                 first_name: 'Zach',
                 last_name: 'Cilwa',
-                role: 'admin', // Assigning a fixed role since we have only one user
+                role: 'admin',
                 organization_id: organizationId,
                 phone_number: generateRandomPhoneNumber(),
                 created_at: new Date(),
@@ -292,7 +271,7 @@ async function seed() {
             operating_hours: 'Mon-Fri: 8:00 AM - 5:00 PM',
             timezone: 'America/Phoenix',
             capacity: getRandomElement([100, 200, 300, 400, 500]),
-            is_primary: name === 'Main Hospital', // Only 'Main Hospital' is primary
+            is_primary: name === 'Main Hospital',
             created_at: new Date(),
             updated_at: new Date(),
         }));
@@ -319,14 +298,13 @@ async function seed() {
 
         const providers = [];
 
-        for (let i = 0; i < 10; i++) { // Create 10 providers
+        for (let i = 0; i < 10; i++) {
             const firstName = getRandomElement(providerFirstNames);
             const lastName = getRandomElement(providerLastNames);
             const specialty = getRandomElement(specialties);
             const location = getRandomElement(createdLocations);
             const email = generateRandomEmail(firstName, lastName);
 
-            // Providers are linked to the main user
             providers.push({
                 first_name: firstName,
                 last_name: lastName,
@@ -335,13 +313,12 @@ async function seed() {
                 email: email,
                 organization_id: organizationId,
                 location_id: location.id,
-                user_id: userId, // Associate with the main user
+                user_id: userId,
                 created_at: new Date(),
                 updated_at: new Date(),
             });
         }
 
-        // Insert providers
         const { data: createdProviders, error: provError } = await supabase
             .from('providers')
             .insert(providers)
@@ -362,7 +339,7 @@ async function seed() {
 
         const patients = [];
 
-        for (let i = 0; i < 20; i++) { // Create 20 patients
+        for (let i = 0; i < 20; i++) {
             const firstName = getRandomElement(patientFirstNames);
             const lastName = getRandomElement(patientLastNames);
             const gender = getRandomElement(genders);
@@ -377,7 +354,7 @@ async function seed() {
             const start = new Date(1950, 0, 1);
             const end = new Date(2005, 11, 31);
             const dob = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-            const dobString = dob.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+            const dobString = dob.toISOString().split('T')[0];
 
             patients.push({
                 first_name: firstName,
@@ -415,7 +392,7 @@ async function seed() {
 
         const appointments = [];
 
-        createdPatients.forEach((patient) => {
+        createdPatients.forEach(patient => {
             const numberOfAppointments = getRandomInt(1, 5);
             for (let i = 0; i < numberOfAppointments; i++) {
                 const provider = getRandomElement(createdProviders);
@@ -459,7 +436,7 @@ async function seed() {
         const relationships = ['Spouse', 'Parent', 'Sibling', 'Child', 'Friend', 'Guardian'];
         const emergencyContacts = [];
 
-        createdPatients.forEach((patient) => {
+        createdPatients.forEach(patient => {
             const hasEmergencyContact = Math.random() < 0.8;
             if (hasEmergencyContact) {
                 const relationship = getRandomElement(relationships);
@@ -547,7 +524,7 @@ async function seed() {
         // 13. Create clinical notes for appointments
         const clinicalNotes = [];
 
-        createdAppointments.forEach((appointment) => {
+        createdAppointments.forEach(appointment => {
             const useTemplate = Math.random() < 0.8;
             const template = useTemplate ? getRandomElement(createdTemplates) : null;
             const type = useTemplate && template ? 'template' : 'manual';
@@ -570,7 +547,7 @@ async function seed() {
 
             clinicalNotes.push({
                 patient_id: appointment.patient_id,
-                provider_id: userId, // Use the main user's ID for all clinical notes
+                provider_id: userId,
                 appointment_id: appointment.id,
                 organization_id: organizationId,
                 content: content,
@@ -612,7 +589,7 @@ async function seed() {
 
         const noteSections = [];
 
-        createdClinicalNotes.forEach((note) => {
+        createdClinicalNotes.forEach(note => {
             sectionTypes.forEach((type, index) => {
                 const content = `${getRandomElement(sectionContents[type])}`;
                 noteSections.push({
@@ -654,14 +631,14 @@ async function seed() {
 
         const noteComments = [];
 
-        createdClinicalNotes.forEach((note) => {
+        createdClinicalNotes.forEach(note => {
             const hasComments = Math.random() < 0.5;
             if (hasComments) {
                 const numberOfComments = getRandomInt(1, 3);
                 for (let i = 0; i < numberOfComments; i++) {
                     noteComments.push({
                         note_id: note.id,
-                        user_id: userId, // Use the main user's ID for all comments
+                        user_id: userId,
                         content: getRandomElement(commentContents),
                         created_at: new Date(),
                         updated_at: new Date(),
