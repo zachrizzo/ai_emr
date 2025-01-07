@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { LayoutDashboard, Users, UserCog, MapPin, Calendar, FileText, Settings, ChevronLeft, ChevronRight, Edit, List, DollarSign, ShieldCheck, CheckSquare, User } from 'lucide-react'
+import { LayoutDashboard, Users, UserCog, MapPin, Calendar, FileText, Settings, ChevronLeft, ChevronRight, Edit, List, DollarSign, ShieldCheck, CheckSquare, User, Printer } from 'lucide-react'
 
 function getUncompletedTasksCount() {
   // This is a mock implementation. In a real app, you'd fetch this from your state or API
@@ -22,6 +22,7 @@ const sidebarItems = [
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Documents', href: '/documents', icon: FileText },
   { name: 'Document Builder', href: '/document-builder', icon: Edit },
+  { name: 'Fax', href: '/fax', icon: Printer },
   { name: 'Billing', href: '/billing', icon: DollarSign },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Admin Dashboard', href: '/admin/dashboard', icon: ShieldCheck },

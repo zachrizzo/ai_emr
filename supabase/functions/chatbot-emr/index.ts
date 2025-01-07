@@ -106,13 +106,26 @@ serve(async (req) => {
         .single()
 
       if (!patientError && patient) {
-        patientContext = `Current patient context: ${JSON.stringify(patient)}.`
+        patientContext = `Current patient context: The patient being discussed has ID ${patient.id}. Patient details: ${JSON.stringify(patient)}.`
       }
     }
 
     // Perform vector search
     const messageEmbedding = await getEmbedding(openai, message)
     const relevantRecords = await performVectorSearch(supabaseClient, messageEmbedding)
+
+    // Get all mentioned patients from the search results
+    const { data: mentionedPatients, error: patientsError } = await supabaseClient
+      .from("patients")
+      .select("id, first_name, last_name")
+      .order("created_at", { ascending: true })
+
+    const patientLinks = mentionedPatients
+      ? `Available patients: ${mentionedPatients.map(p =>
+          `<a href="/patients/${p.id}">${p.first_name} ${p.last_name}</a>`
+        ).join(', ')}.`
+      : ""
+
     const relevantContext = relevantRecords.length > 0
       ? `Here is some relevant information from the medical records: ${JSON.stringify(relevantRecords)}`
       : ""
@@ -122,7 +135,18 @@ serve(async (req) => {
         role: "system",
         content: `You are a medical assistant AI helping with an Electronic Medical Records system.
                  ${patientContext}
+                 ${patientLinks}
                  ${relevantContext}
+
+                 IMPORTANT FORMATTING INSTRUCTIONS:
+                 1. ALWAYS wrap patient names in HTML links using: <a href="/patients/[patient_id]">[Patient Name]</a>
+                 2. ALWAYS wrap provider names in HTML links using: <a href="/providers/[provider_id]">[Provider Name]</a>
+                 3. ALWAYS structure your response with HTML tags for better readability
+                 4. Example format:
+                    <h3>Patient Information</h3>
+                    <p>Patient: <a href="/patients/123">John Doe</a></p>
+                    <p>Provider: <a href="/providers/456">Dr. Smith</a></p>
+
                  Please provide accurate and relevant information while maintaining HIPAA compliance.`
     }
 

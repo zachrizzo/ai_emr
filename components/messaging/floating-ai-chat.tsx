@@ -32,6 +32,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import DOMPurify from 'isomorphic-dompurify'
 
 interface Message {
     role: 'user' | 'assistant'
@@ -50,6 +51,20 @@ interface Conversation {
 }
 
 const EDGE_FUNCTION_URL = 'http://127.0.0.1:54321/functions/v1/chatbot-emr'
+
+const messageStyles = {
+    // Base styles for the message content
+    content: `
+        [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:text-primary/90
+        [&_p]:mb-2 [&_p]:leading-relaxed
+        [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-4
+        [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-4
+        [&_li]:mb-1
+        [&_strong]:font-semibold [&_strong]:text-primary/90
+        [&_a]:text-blue-500 hover:[&_a]:text-blue-700 [&_a]:underline [&_a]:transition-colors
+        [&_em]:italic
+    `
+}
 
 export function FloatingAIChat() {
     const [isOpen, setIsOpen] = useState(false)
@@ -665,9 +680,25 @@ export function FloatingAIChat() {
                                                     }`}
                                             >
                                                 <div className="flex flex-col">
-                                                    <div className="text-sm break-words">
-                                                        {message.content}
-                                                    </div>
+                                                    <div
+                                                        className={`text-sm break-words ${messageStyles.content}`}
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: DOMPurify.sanitize(message.content, {
+                                                                ALLOWED_TAGS: ['a', 'p', 'ul', 'li', 'ol', 'strong', 'em', 'h3', 'h4', 'br'],
+                                                                ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+                                                            })
+                                                        }}
+                                                        onClick={(e) => {
+                                                            const target = e.target as HTMLElement;
+                                                            if (target.tagName === 'A') {
+                                                                e.preventDefault();
+                                                                const href = target.getAttribute('href');
+                                                                if (href) {
+                                                                    window.location.href = href;
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
                                                     {message.attachments && message.attachments.length > 0 && (
                                                         <div className="mt-2 space-y-2">
                                                             {message.attachments.map((url, i) => {
