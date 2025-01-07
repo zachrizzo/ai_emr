@@ -457,6 +457,14 @@ export function FloatingAIChat() {
                 fileInputRef.current.value = ''
             }
 
+            const body = JSON.stringify({
+                message: currentQuery,
+                conversationId: selectedConversation.id,
+                patientId: selectedConversation.patientId,
+                attachments: attachmentUrls
+            })
+
+
             // Send message to Edge Function
             const response = await fetch(EDGE_FUNCTION_URL, {
                 method: 'POST',
@@ -466,12 +474,7 @@ export function FloatingAIChat() {
                 },
                 credentials: 'include',
                 mode: 'cors',
-                body: JSON.stringify({
-                    message: currentQuery,
-                    conversationId: selectedConversation.id,
-                    patientId: selectedConversation.patientId,
-                    attachments: attachmentUrls
-                }),
+                body: body
             })
 
             if (!response.ok) {
