@@ -20,7 +20,7 @@ import { AIAssistant } from "@/components/documentation/ai-assistant"
 import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate } from '@/types/notes'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
-import { Mic, MicOff, Trash2 } from 'lucide-react'
+import { Mic, MicOff, Trash2, Save, FileText, Sparkles, X } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"
 import {
     AlertDialog,
@@ -34,12 +34,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { getClinicalNotes, deleteClinicalNote, subscribeToClinicalNotes } from '@/lib/services/clinical-notes'
-
-interface Appointment {
-    id: string
-    appointment_date: string
-    reason_for_visit: string
-}
+import { Badge } from "@/components/ui/badge"
 
 interface NotesTabProps {
     patientId: string
@@ -62,7 +57,7 @@ export function NotesTab({
 }: NotesTabProps) {
     const [notes, setNotes] = useState<ClinicalNote[]>([])
     const [templates, setTemplates] = useState<NoteTemplate[]>([])
-    const [appointments, setAppointments] = useState<Appointment[]>([])
+    const [appointments, setAppointments] = useState<any[]>([])
     const [selectedTemplate, setSelectedTemplate] = useState<NoteTemplate | null>(null)
     const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null)
     const [editorContent, setEditorContent] = useState('')
@@ -70,19 +65,21 @@ export function NotesTab({
     const [recordingTranscript, setRecordingTranscript] = useState('')
     const [isLoading, setIsLoading] = useState(true)
     const [noteToDelete, setNoteToDelete] = useState<ClinicalNote | null>(null)
+    const [patientData, setPatientData] = useState<any>(null)
+    const [activeTab, setActiveTab] = useState<'editor' | 'ai'>('editor')
 
     useEffect(() => {
         loadNotes()
         loadTemplates()
         loadAppointments()
+        loadPatientData()
 
-        // Subscribe to real-time updates
         const unsubscribe = subscribeToClinicalNotes(
             patientId,
             organizationId,
-            () => loadNotes(), // on insert
-            () => loadNotes(), // on update
-            () => loadNotes()  // on delete
+            () => loadNotes(),
+            () => loadNotes(),
+            () => loadNotes()
         )
 
         return () => {
@@ -146,6 +143,25 @@ export function NotesTab({
         }
     }
 
+    async function loadPatientData() {
+        try {
+            const { data: patient, error } = await supabase
+                .from('patients')
+                .select(`
+                    *,
+                    medical_history:medical_histories(*),
+                    medications:patient_medications(*)
+                `)
+                .eq('id', patientId)
+                .single()
+
+            if (error) throw error
+            setPatientData(patient)
+        } catch (error) {
+            console.error('Error loading patient data:', error)
+        }
+    }
+
     const handleCreateNote = async () => {
         const noteData: CreateClinicalNoteParams = {
             patient_id: patientId,
@@ -189,6 +205,10 @@ export function NotesTab({
         setSelectedTemplate(null)
         setSelectedAppointment(null)
         loadNotes()
+        toast({
+            title: 'Success',
+            description: 'Note created successfully.',
+        })
     }
 
     const handleUpdateNote = async () => {
@@ -201,6 +221,10 @@ export function NotesTab({
 
         await onUpdateNote(activeNote.id, noteData)
         loadNotes()
+        toast({
+            title: 'Success',
+            description: 'Note updated successfully.',
+        })
     }
 
     const handleVoiceRecordingComplete = (transcript: string) => {
@@ -210,10 +234,21 @@ export function NotesTab({
 
     const handleTemplateSelect = (template: NoteTemplate) => {
         setSelectedTemplate(template)
+        let content = template.content
+        if (patientData) {
+            content = content.replace(/\{patient\.name\}/g, `${patientData.first_name} ${patientData.last_name}`)
+            content = content.replace(/\{patient\.age\}/g, patientData.age?.toString() || '')
+            content = content.replace(/\{patient\.gender\}/g, patientData.gender || '')
+            content = content.replace(/\{patient\.dob\}/g, patientData.date_of_birth ? format(new Date(patientData.date_of_birth), 'MMM d, yyyy') : '')
+            content = content.replace(/\{date\}/g, format(new Date(), 'MMM d, yyyy'))
+            content = content.replace(/\{time\}/g, format(new Date(), 'h:mm a'))
+        }
+        setEditorContent(content)
     }
 
     const handleAIAssist = (suggestion: string) => {
         setEditorContent((prev) => prev + '\n' + suggestion)
+        setActiveTab('editor')
     }
 
     const handleDeleteNote = async (note: ClinicalNote) => {
@@ -223,15 +258,15 @@ export function NotesTab({
                 onEditNote(null)
             }
             toast({
-                title: 'Note Deleted',
-                description: 'The clinical note has been deleted successfully.',
+                title: 'Success',
+                description: 'Note deleted successfully.',
             })
             loadNotes()
         } catch (error) {
             console.error('Error deleting note:', error)
             toast({
                 title: 'Error',
-                description: 'Failed to delete the note. Please try again.',
+                description: 'Failed to delete note. Please try again.',
                 variant: 'destructive',
             })
         }
@@ -252,15 +287,33 @@ export function NotesTab({
                 </ScrollArea>
             </Card>
 
-            {/* Main Content - Note Editor */}
+            {/* Main Content */}
             <div className="col-span-6 space-y-4">
                 <Card className="p-4">
                     <div className="flex flex-col gap-4">
-                        {/* Header with controls */}
+                        {/* Header Controls */}
                         <div className="flex items-center justify-between">
-                            <h3 className="font-semibold">
-                                {activeNote ? 'Edit Note' : 'New Note'}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold">
+                                    {activeNote ? 'Edit Note' : 'New Note'}
+                                </h3>
+                                {selectedTemplate && (
+                                    <Badge variant="secondary" className="gap-1">
+                                        Template: {selectedTemplate.name}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-4 w-4 p-0 hover:bg-transparent"
+                                            onClick={() => {
+                                                setSelectedTemplate(null)
+                                                setEditorContent('')
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </Badge>
+                                )}
+                            </div>
                             <div className="flex items-center gap-4">
                                 {/* Appointment Selector */}
                                 <Select
@@ -293,59 +346,77 @@ export function NotesTab({
                                 </Button>
 
                                 {/* Save/Update Button */}
-                                {activeNote ? (
-                                    <Button onClick={handleUpdateNote}>Update Note</Button>
-                                ) : (
-                                    <Button onClick={handleCreateNote}>Create Note</Button>
-                                )}
+                                <Button
+                                    onClick={activeNote ? handleUpdateNote : handleCreateNote}
+                                    className="gap-2"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    {activeNote ? 'Update' : 'Save'}
+                                </Button>
                             </div>
                         </div>
 
-                        {/* Voice Recorder (when active) */}
-                        {isRecording && (
-                            <div className="border rounded-lg p-4 bg-muted/50">
-                                <VoiceRecorder
-                                    isRecording={isRecording}
-                                    onStartRecording={() => setIsRecording(true)}
-                                    onStopRecording={() => setIsRecording(false)}
-                                    onTranscriptionComplete={handleVoiceRecordingComplete}
-                                />
-                            </div>
-                        )}
+                        {/* Tabs for Editor and AI */}
+                        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'editor' | 'ai')}>
+                            <TabsList>
+                                <TabsTrigger value="editor" className="gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Editor
+                                </TabsTrigger>
+                                <TabsTrigger value="ai" className="gap-2">
+                                    <Sparkles className="h-4 w-4" />
+                                    AI Assistant
+                                </TabsTrigger>
+                            </TabsList>
 
-                        {/* Editor */}
-                        <TipTapEditor
-                            content={editorContent}
-                            onChange={setEditorContent}
-                            editable={!isRecording}
-                        />
+                            <TabsContent value="editor">
+                                {/* Voice Recorder */}
+                                {isRecording && (
+                                    <div className="border rounded-lg p-4 bg-muted/50 mb-4">
+                                        <VoiceRecorder
+                                            isRecording={isRecording}
+                                            onStartRecording={() => setIsRecording(true)}
+                                            onStopRecording={() => setIsRecording(false)}
+                                            onTranscriptionComplete={handleVoiceRecordingComplete}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Editor */}
+                                <TipTapEditor
+                                    content={editorContent}
+                                    onChange={setEditorContent}
+                                    editable={!isRecording}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="ai">
+                                <AIAssistant
+                                    noteContent={editorContent}
+                                    onSuggestion={handleAIAssist}
+                                    patientData={{
+                                        age: patientData?.age,
+                                        gender: patientData?.gender,
+                                        medicalHistory: patientData?.medical_history,
+                                        medications: patientData?.medications
+                                    }}
+                                />
+                            </TabsContent>
+                        </Tabs>
                     </div>
                 </Card>
             </div>
 
-            {/* Right Sidebar - Tools */}
+            {/* Right Sidebar - Templates */}
             <Card className="col-span-3 p-4">
-                <Tabs defaultValue="templates">
-                    <TabsList className="grid grid-cols-2 w-full">
-                        <TabsTrigger value="templates">Templates</TabsTrigger>
-                        <TabsTrigger value="ai">AI Assist</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="templates">
-                        <NoteTemplateSelector
-                            templates={templates}
-                            selectedTemplate={selectedTemplate}
-                            onSelectTemplate={handleTemplateSelect}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="ai">
-                        <AIAssistant
-                            noteContent={editorContent}
-                            onSuggestion={handleAIAssist}
-                        />
-                    </TabsContent>
-                </Tabs>
+                <h3 className="font-semibold mb-4">Templates</h3>
+                <ScrollArea className="h-[calc(100vh-300px)]">
+                    <NoteTemplateSelector
+                        templates={templates}
+                        selectedTemplate={selectedTemplate}
+                        onSelectTemplate={handleTemplateSelect}
+                    />
+                </ScrollArea>
             </Card>
 
             {/* Delete Note Dialog */}

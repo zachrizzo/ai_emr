@@ -118,7 +118,9 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <h1 className="text-3xl font-bold">{`${patient.first_name} ${patient.last_name}`}</h1>
+        <h1 className="text-3xl font-bold">
+          {patient.first_name} {patient.last_name}
+        </h1>
       </div>
 
       <Tabs defaultValue="personal">

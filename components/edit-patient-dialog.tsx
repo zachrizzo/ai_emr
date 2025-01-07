@@ -38,13 +38,13 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
   }
 
   const addEmergencyContact = () => {
-    setEditedEmergencyContacts([...editedEmergencyContacts, { 
+    setEditedEmergencyContacts([...editedEmergencyContacts, {
       id: null,
-      patient_id: patient.id, 
-      name: '', 
-      relationship: '', 
+      patient_id: patient.id,
+      name: '',
+      relationship: '',
       phone_number: '',
-      organization_id: patient.organization_id 
+      organization_id: patient.organization_id
     }])
   }
 
@@ -56,7 +56,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setEditedInsurances([...editedInsurances, {
-      id: 0, 
+      id: 0,
       patient_id: patient.id,
       provider_name: '',
       policy_number: '',
@@ -65,7 +65,7 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       organization_id: patient.organization_id,
-      created_by: patient.id 
+      created_by: patient.id
     }])
   }
 
@@ -100,24 +100,33 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="full_name">Full Name</Label>
+              <Label htmlFor="first_name">First Name</Label>
               <Input
-                id="full_name"
-                value={editedPatient.full_name}
-                onChange={(e) => setEditedPatient({ ...editedPatient, full_name: e.target.value })}
+                id="first_name"
+                value={editedPatient.first_name}
+                onChange={(e) => setEditedPatient({ ...editedPatient, first_name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <Label htmlFor="date_of_birth">Date of Birth</Label>
+              <Label htmlFor="last_name">Last Name</Label>
               <Input
-                id="date_of_birth"
-                type="date"
-                value={editedPatient.date_of_birth}
-                onChange={(e) => setEditedPatient({ ...editedPatient, date_of_birth: e.target.value })}
+                id="last_name"
+                value={editedPatient.last_name}
+                onChange={(e) => setEditedPatient({ ...editedPatient, last_name: e.target.value })}
                 required
               />
             </div>
+          </div>
+          <div>
+            <Label htmlFor="date_of_birth">Date of Birth</Label>
+            <Input
+              id="date_of_birth"
+              type="date"
+              value={editedPatient.date_of_birth}
+              onChange={(e) => setEditedPatient({ ...editedPatient, date_of_birth: e.target.value })}
+              required
+            />
           </div>
           <div>
             <Label htmlFor="gender">Gender</Label>
@@ -237,10 +246,10 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
                     }}
                   />
                 </div>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeEmergencyContact(index)}
                   className="absolute top-2 right-2"
                 >
@@ -338,10 +347,10 @@ export function EditPatientDialog({ isOpen, onClose, patient, emergencyContacts,
                     required
                   />
                 </div>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeInsurance(index)}
                   className="absolute top-2 right-2"
                 >

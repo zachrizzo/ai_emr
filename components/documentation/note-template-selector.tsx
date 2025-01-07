@@ -1,13 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { NoteTemplate } from '@/types/notes'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Input } from "@/components/ui/input"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import { Search, FileText } from 'lucide-react'
+import { NoteTemplate } from '@/types/notes'
+import { FileText, Search, Tag, Clock, Check } from 'lucide-react'
+import { format } from 'date-fns'
+import { toast } from "@/components/ui/use-toast"
 
 interface NoteTemplateSelectorProps {
     templates: NoteTemplate[]
@@ -21,87 +30,124 @@ export function NoteTemplateSelector({
     onSelectTemplate
 }: NoteTemplateSelectorProps) {
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all')
+    const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
-    const categories = Array.from(
-        new Set(templates.map(template => template.category).filter((category): category is string => !!category))
-    )
+    // Get unique specialties and categories
+    const specialties = ['all', ...new Set(templates.map(t => t.specialty || 'uncategorized'))]
+    const categories = ['all', ...new Set(templates.map(t => t.category || 'uncategorized'))]
 
+    // Filter templates based on search and filters
     const filteredTemplates = templates.filter(template => {
         const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             template.content.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = !selectedCategory || template.category === selectedCategory
-        return matchesSearch && matchesCategory
+        const matchesSpecialty = selectedSpecialty === 'all' || template.specialty === selectedSpecialty
+        const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory
+        return matchesSearch && matchesSpecialty && matchesCategory
     })
+
+    const handleTemplateSelect = (template: NoteTemplate) => {
+        onSelectTemplate(template)
+        toast({
+            title: 'Template Selected',
+            description: `Template "${template.name}" has been loaded into the editor.`,
+        })
+    }
 
     return (
         <div className="space-y-4">
-            <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Search templates..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8"
-                />
+            {/* Search and Filters */}
+            <div className="space-y-3">
+                <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search templates..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8"
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Specialty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {specialties.map((specialty) => (
+                                <SelectItem key={specialty} value={specialty}>
+                                    {specialty.charAt(0).toUpperCase() + specialty.slice(1)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
-            {categories.length > 0 && (
-                <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="flex gap-2 pb-4">
-                        <Button
-                            variant={selectedCategory === null ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setSelectedCategory(null)}
-                        >
-                            All
-                        </Button>
-                        {categories.map((category) => (
-                            <Button
-                                key={category}
-                                variant={selectedCategory === category ? "secondary" : "ghost"}
-                                size="sm"
-                                onClick={() => setSelectedCategory(category)}
-                            >
-                                {category}
-                            </Button>
-                        ))}
-                    </div>
-                </ScrollArea>
-            )}
-
-            <ScrollArea className="h-[400px]">
+            {/* Template List */}
+            <ScrollArea className="h-[calc(100vh-400px)]">
                 <div className="space-y-2">
                     {filteredTemplates.map((template) => (
-                        <Button
+                        <Card
                             key={template.id}
-                            variant="ghost"
-                            className={cn(
-                                "w-full justify-start p-3",
-                                selectedTemplate?.id === template.id && "bg-accent"
-                            )}
-                            onClick={() => onSelectTemplate(template)}
+                            className={`p-3 cursor-pointer transition-colors hover:bg-accent ${selectedTemplate?.id === template.id ? 'border-primary bg-accent' : ''
+                                }`}
+                            onClick={() => handleTemplateSelect(template)}
                         >
-                            <div className="flex items-start gap-2">
-                                <FileText className="h-4 w-4 mt-1" />
-                                <div className="flex flex-col items-start gap-1 text-left">
-                                    <span className="font-medium">{template.name}</span>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4" />
+                                        <span className="font-medium">{template.name}</span>
+                                    </div>
+                                    {selectedTemplate?.id === template.id && (
+                                        <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1">
                                     {template.specialty && (
-                                        <Badge variant="outline" className="text-xs">
+                                        <Badge variant="secondary">
                                             {template.specialty}
                                         </Badge>
                                     )}
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                        {template.content}
-                                    </p>
+                                    {template.category && (
+                                        <Badge variant="outline">
+                                            {template.category}
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    <span>
+                                        Updated {format(new Date(template.updated_at), 'MMM d, yyyy')}
+                                    </span>
+                                </div>
+
+                                <div className="text-sm text-muted-foreground line-clamp-2">
+                                    {template.content.substring(0, 150)}...
                                 </div>
                             </div>
-                        </Button>
+                        </Card>
                     ))}
 
                     {filteredTemplates.length === 0 && (
                         <div className="text-center text-sm text-muted-foreground py-4">
-                            No templates found
+                            No templates found matching your criteria.
                         </div>
                     )}
                 </div>

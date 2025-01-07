@@ -235,7 +235,7 @@ export function PersonalInformationTab({ patientId }: PersonalInformationTabProp
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p><strong>Full Name:</strong> {patient.full_name}</p>
+            <p><strong>Name:</strong> {patient.first_name} {patient.last_name}</p>
             <p><strong>Date of Birth:</strong> {format(new Date(patient.date_of_birth), 'MMM d, yyyy')}</p>
             <p><strong>Gender:</strong> {patient.gender}</p>
             <p><strong>Address:</strong> {patient.address}</p>
