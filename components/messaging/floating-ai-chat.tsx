@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { supabase } from '@/lib/supabase'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { format } from 'date-fns'
 import { Textarea } from '@/components/ui/textarea'
@@ -33,6 +33,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import DOMPurify from 'isomorphic-dompurify'
+import { useOrganization } from '@/hooks/use-organization'
 
 interface Message {
     role: 'user' | 'assistant'
@@ -67,6 +68,7 @@ const messageStyles = {
 }
 
 export function FloatingAIChat() {
+    const { organization } = useOrganization()
     const [isOpen, setIsOpen] = useState(false)
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
@@ -146,6 +148,7 @@ export function FloatingAIChat() {
             const newConversation = {
                 id: conversationId,
                 name,
+                organization_id: organization?.id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 messages: []
@@ -156,6 +159,7 @@ export function FloatingAIChat() {
                 .insert({
                     id: conversationId,
                     name,
+                    organization_id: organization?.id,
                     created_at: newConversation.created_at,
                     updated_at: newConversation.updated_at
                 })
@@ -422,6 +426,14 @@ export function FloatingAIChat() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedConversation || (!query.trim() && selectedFiles.length === 0)) return
+        if (!organization?.id) {
+            toast({
+                title: 'Error',
+                description: 'No organization selected.',
+                variant: 'destructive'
+            })
+            return
+        }
 
         setIsLoading(true)
         const currentQuery = query
@@ -476,6 +488,7 @@ export function FloatingAIChat() {
                 message: currentQuery,
                 conversationId: selectedConversation.id,
                 patientId: selectedConversation.patientId,
+                organizationId: organization.id,
                 attachments: attachmentUrls
             })
 
@@ -596,6 +609,9 @@ export function FloatingAIChat() {
                                     <DialogContent>
                                         <DialogHeader>
                                             <DialogTitle>New Conversation</DialogTitle>
+                                            <DialogDescription>
+                                                Create a new conversation to start chatting with the AI assistant.
+                                            </DialogDescription>
                                         </DialogHeader>
                                         <div className="grid gap-4 py-4">
                                             <div className="grid grid-cols-4 items-center gap-4">
@@ -611,7 +627,7 @@ export function FloatingAIChat() {
                                         </div>
                                         <Button
                                             onClick={() => createNewConversation(newConversationName)}
-                                            disabled={!newConversationName.trim()}
+                                            disabled={!newConversationName.trim() || !organization?.id}
                                         >
                                             Create
                                         </Button>

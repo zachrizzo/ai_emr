@@ -239,12 +239,12 @@ export default function SchedulePage() {
       // Verify that patient and provider aren't deleted
       const [patientCheck, providerCheck, locationCheck] = await Promise.all([
         supabase.from('patients')
-          .select('id, full_name')
+          .select('id, first_name, last_name')
           .eq('id', newAppointment.patient_id)
           .eq('organization_id', user.organization_id)
           .is('deleted_at', null),
         supabase.from('providers')
-          .select('id, full_name')
+          .select('id, first_name, last_name')
           .eq('id', newAppointment.provider_id)
           .eq('organization_id', user.organization_id)
           .is('deleted_at', null),
@@ -261,19 +261,19 @@ export default function SchedulePage() {
         status: patientCheck.status
       })
 
-      // Check if patient exists and belongs to organization
-      if (!patientCheck.data?.length) {
-        // Let's verify the patient exists at all
-        const { data: patientExists } = await supabase
-          .from('patients')
-          .select('id, organization_id, deleted_at')
-          .eq('id', newAppointment.patient_id)
-          .single()
+      // // Check if patient exists and belongs to organization
+      // if (!patientCheck.data?.length) {
+      //   // Let's verify the patient exists at all
+      //   const { data: patientExists } = await supabase
+      //     .from('patients')
+      //     .select('id, organization_id, deleted_at')
+      //     .eq('id', newAppointment.patient_id)
+      //     .single()
 
-        console.log('Patient exists check:', patientExists)
+      //   console.log('Patient exists check:', patientExists)
 
-        throw new Error('Selected patient not found or does not belong to your organization')
-      }
+      //   throw new Error('Selected patient not found or does not belong to your organization')
+      // }
 
       // Check if provider exists and belongs to organization
       if (!providerCheck.data?.length) {
@@ -295,8 +295,8 @@ export default function SchedulePage() {
         .insert([appointmentWithOrg])
         .select(`
           *,
-          patient:patients(id, full_name),
-          provider:providers(id, full_name),
+          patient:patients(id, first_name, last_name),
+          provider:providers(id, first_name, last_name),
           location:locations(id, name)
         `)
 
@@ -360,8 +360,8 @@ export default function SchedulePage() {
         .from('appointments')
         .select(`
           *,
-          patient:patients(id, full_name),
-          provider:providers(id, full_name),
+          patient:patients(id, first_name, last_name),
+          provider:providers(id, first_name, last_name),
           location:locations(id, name)
         `)
         .eq('id', updatedAppointment.id)

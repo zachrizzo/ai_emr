@@ -45,7 +45,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
                 .from('patients')
                 .select(`
                     id,
-                    full_name,
+                    first_name,
+                    last_name,
                     date_of_birth,
                     gender,
                     address,
@@ -59,7 +60,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
                 `)
                 .eq('organization_id', user.organization_id)
                 .is('deleted_at', null)
-                .order('full_name')
+                .order('first_name')
 
             if (error) {
                 console.error('Error fetching patients:', error)
@@ -70,7 +71,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
                 count: data?.length || 0,
                 sample: data?.[0] ? {
                     id: data[0].id,
-                    name: data[0].full_name,
+                    name: `${data[0].first_name} ${data[0].last_name}`,
                     org: data[0].organization_id
                 } : null
             })

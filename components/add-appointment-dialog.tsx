@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ interface AddAppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onAddAppointment: (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => void;
+  patientId?: string;
 }
 
 const formatStatus = (status: string) => {
@@ -30,6 +31,7 @@ export function AddAppointmentDialog({
   isOpen,
   onClose,
   onAddAppointment,
+  patientId
 }: AddAppointmentDialogProps) {
   const { toast } = useToast()
   const { providers = [] } = useProviders()
@@ -41,11 +43,12 @@ export function AddAppointmentDialog({
     locationsCount: locations?.length || 0,
     patientsCount: patients?.length || 0,
     isLoading: patientsLoading,
-    patientsError: patientsError?.message
+    patientsError: patientsError?.message,
+    patientId
   })
 
   const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'created_at' | 'updated_at'>>({
-    patient_id: '',
+    patient_id: patientId || '',
     provider_id: '',
     location_id: null,
     appointment_date: '',
@@ -57,6 +60,24 @@ export function AddAppointmentDialog({
     visit_type: 'in_person',
     organization_id: ''
   })
+
+  // Reset form when dialog opens/closes or patientId changes
+  useEffect(() => {
+    setNewAppointment(prev => ({
+      ...prev,
+      patient_id: patientId || '',
+      provider_id: '',
+      location_id: null,
+      appointment_date: '',
+      appointment_type: '',
+      status: 'scheduled',
+      reason_for_visit: '',
+      duration_minutes: 30,
+      notes: '',
+      visit_type: 'in_person',
+      organization_id: ''
+    }))
+  }, [isOpen, patientId])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,7 +125,7 @@ export function AddAppointmentDialog({
                 value={newAppointment.patient_id}
                 onValueChange={(value) => setNewAppointment({ ...newAppointment, patient_id: value })}
                 required
-                disabled={patientsLoading}
+                disabled={patientsLoading || !!patientId} // Disable if patientId is provided
               >
                 <SelectTrigger className="w-full">
                   {selectedPatient ? (
