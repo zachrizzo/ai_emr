@@ -19,110 +19,258 @@ function formatRecordContent(record: any, recordType: string): string {
       return `Patient: ${record.first_name} ${record.last_name}, DOB: ${record.date_of_birth},
               Gender: ${record.gender}, Contact: ${record.phone_number}, ${record.email}`
     case 'appointment':
-      return `Appointment on ${record.appointment_date} for ${record.reason_for_visit}.
-              Status: ${record.status}, Type: ${record.appointment_type},
-              Notes: ${record.notes || 'No notes'}`
+      const appointmentDate = new Date(record.appointment_date).toLocaleString()
+      return `Appointment Details:
+              Patient ID: ${record.patient_id}
+              Date and Time: ${appointmentDate}
+              Provider ID: ${record.provider_id}
+              Type: ${record.appointment_type}
+              Visit Type: ${record.visit_type || 'in_person'}
+              Status: ${record.status}
+              Reason: ${record.reason_for_visit || 'No reason provided'}
+              Duration: ${record.duration_minutes} minutes
+              Notes: ${record.notes || 'No notes'}
+              Location ID: ${record.location_id || 'No location'}
+              Created At: ${new Date(record.created_at).toLocaleString()}
+              Last Updated: ${new Date(record.updated_at).toLocaleString()}`
     case 'medication':
       return `Medication: ${record.name}, Dosage: ${record.dosage},
               Instructions: ${record.instructions}, Status: ${record.status}`
+    case 'note':
+      return `Clinical Note:
+              Patient ID: ${record.patient_id}
+              Provider ID: ${record.provider_id}
+              Date: ${new Date(record.created_at).toLocaleString()}
+              Type: ${record.note_type}
+              Content: ${record.content}
+              Status: ${record.status}`
     default:
       return JSON.stringify(record)
   }
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
+// Function to get the correct table name
+function getTableName(recordType: string): string {
+  const tableMap: { [key: string]: string } = {
+    'patient': 'patients',
+    'provider': 'providers',
+    'appointment': 'appointments',
+    'medication': 'medications',
+    'note': 'clinical_notes'
+  }
+  return tableMap[recordType] || recordType
+}
+
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     )
 
-    // Initialize OpenAI
     const openai = new OpenAI({
       apiKey: Deno.env.get("OPENAI_API_KEY"),
     })
 
-    // Get unprocessed items from the queue
-    const { data: queueItems, error: queueError } = await supabaseClient
-      .from('embedding_refresh_queue')
-      .select('*')
-      .eq('processed', false)
-      .limit(10)
+    // Get request payload
+    const { record_type, record_id, organization_id, trigger_id } = await req.json().catch(() => ({}))
 
-    if (queueError) {
-      throw new Error(`Failed to fetch queue items: ${queueError.message}`)
-    }
+    // If we have a specific record to process, handle it directly
+    if (record_type && record_id && organization_id) {
+      console.log(`Processing single record: ${record_type} ${record_id}`)
 
-    if (!queueItems || queueItems.length === 0) {
+      const tableName = getTableName(record_type)
+      console.log(`Using table name: ${tableName}`)
+
+      // Fetch the record
+      const { data: record, error: recordError } = await supabaseClient
+        .from(tableName)
+        .select('*')
+        .eq('id', record_id)
+        .single()
+
+      if (recordError || !record) {
+        throw new Error(`Failed to fetch record: ${recordError?.message}`)
+      }
+
+      // Format and create embedding
+      const content = formatRecordContent(record, record_type)
+      const embedding = await getEmbedding(openai, content)
+
+      // First try to update existing embedding
+      const { error: updateError } = await supabaseClient
+        .from('record_embeddings')
+        .update({
+          content,
+          embedding,
+          organization_id
+        })
+        .match({
+          record_type,
+          record_id
+        })
+
+      // If no rows were updated, insert new embedding
+      if (updateError) {
+        const { error: insertError } = await supabaseClient
+          .from('record_embeddings')
+          .insert({
+            record_type,
+            record_id,
+            content,
+            embedding,
+            organization_id
+          })
+
+        if (insertError) {
+          throw new Error(`Failed to store embedding: ${insertError.message}`)
+        }
+      }
+
+      // Mark queue item as processed if we have a trigger_id
+      if (trigger_id) {
+        const { error: queueUpdateError } = await supabaseClient
+          .from('embedding_refresh_queue')
+          .update({ processed: true })
+          .eq('id', trigger_id)
+
+        if (queueUpdateError) {
+          console.error(`Failed to mark queue item ${trigger_id} as processed:`, queueUpdateError)
+        }
+      }
+
       return new Response(
-        JSON.stringify({ message: "No items to process" }),
+        JSON.stringify({
+          message: "Successfully processed record",
+          record_type,
+          record_id
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
-    // Process each queue item
-    for (const item of queueItems) {
-      try {
-        // Fetch the record data
-        const { data: record, error: recordError } = await supabaseClient
-          .from(item.record_type + 's') // Add 's' for table name
-          .select('*')
-          .eq('id', item.record_id)
-          .single()
+    // Otherwise, process the queue in batches
+    let totalProcessed = 0
+    let hasMoreItems = true
+    const BATCH_SIZE = 10
 
-        if (recordError || !record) {
-          console.error(`Failed to fetch record: ${recordError?.message}`)
-          continue
-        }
+    while (hasMoreItems) {
+      // Get next batch of unprocessed items
+      const { data: queueItems, error: queueError } = await supabaseClient
+        .from('embedding_refresh_queue')
+        .select('*')
+        .eq('processed', false)
+        .limit(BATCH_SIZE)
 
-        // Format the record content
-        const content = formatRecordContent(record, item.record_type)
-
-        // Generate embedding
-        const embedding = await getEmbedding(openai, content)
-
-        // Store the embedding
-        const { error: embeddingError } = await supabaseClient
-          .from('record_embeddings')
-          .upsert({
-            record_type: item.record_type,
-            record_id: item.record_id,
-            content,
-            embedding,
-            organization_id: item.organization_id
-          })
-
-        if (embeddingError) {
-          throw new Error(`Failed to store embedding: ${embeddingError.message}`)
-        }
-
-        // Mark queue item as processed
-        await supabaseClient
-          .from('embedding_refresh_queue')
-          .update({ processed: true })
-          .eq('id', item.id)
-
-      } catch (error) {
-        console.error(`Error processing queue item ${item.id}:`, error)
+      if (queueError) {
+        throw new Error(`Failed to fetch queue items: ${queueError.message}`)
       }
+
+      if (!queueItems || queueItems.length === 0) {
+        hasMoreItems = false
+        break
+      }
+
+      console.log(`Processing batch of ${queueItems.length} items`)
+
+      // Process each queue item in the current batch
+      for (const item of queueItems) {
+        try {
+          console.log(`Processing item ${item.id} for record type ${item.record_type}`)
+
+          const tableName = getTableName(item.record_type)
+          console.log(`Using table name: ${tableName}`)
+
+          const { data: record, error: recordError } = await supabaseClient
+            .from(tableName)
+            .select('*')
+            .eq('id', item.record_id)
+            .single()
+
+          if (recordError || !record) {
+            console.error(`Failed to fetch record: ${recordError?.message}`)
+            await supabaseClient
+              .from('embedding_refresh_queue')
+              .update({ processed: true })
+              .eq('id', item.id)
+            continue
+          }
+
+          const content = formatRecordContent(record, item.record_type)
+          const embedding = await getEmbedding(openai, content)
+
+          // First try to update existing embedding
+          const { error: updateError } = await supabaseClient
+            .from('record_embeddings')
+            .update({
+              content,
+              embedding,
+              organization_id: item.organization_id
+            })
+            .match({
+              record_type: item.record_type,
+              record_id: item.record_id
+            })
+
+          // If no rows were updated, insert new embedding
+          if (updateError) {
+            const { error: insertError } = await supabaseClient
+              .from('record_embeddings')
+              .insert({
+                record_type: item.record_type,
+                record_id: item.record_id,
+                content,
+                embedding,
+                organization_id: item.organization_id
+              })
+
+            if (insertError) {
+              throw new Error(`Failed to store embedding: ${insertError.message}`)
+            }
+          }
+
+          const { error: queueUpdateError } = await supabaseClient
+            .from('embedding_refresh_queue')
+            .update({ processed: true })
+            .eq('id', item.id)
+
+          if (queueUpdateError) {
+            console.error(`Failed to mark item ${item.id} as processed:`, queueUpdateError)
+          } else {
+            console.log(`Successfully processed item ${item.id}`)
+            totalProcessed++
+          }
+
+        } catch (error) {
+          console.error(`Error processing queue item ${item.id}:`, error)
+          await supabaseClient
+            .from('embedding_refresh_queue')
+            .update({ processed: true })
+            .eq('id', item.id)
+        }
+      }
+
+      // Add a small delay between batches to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
     return new Response(
-      JSON.stringify({ message: `Processed ${queueItems.length} items` }),
+      JSON.stringify({
+        message: `Completed processing queue`,
+        totalProcessed,
+        hasMoreItems: false
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
 
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Edge function error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Internal Server Error"
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Internal Server Error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

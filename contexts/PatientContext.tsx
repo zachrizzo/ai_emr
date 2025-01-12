@@ -24,7 +24,6 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     const { user } = useUser()
     const supabase = createClient()
 
-    console.log('PatientProvider - User:', user?.id, 'Organization:', user?.organization_id)
 
     const {
         data: patients,
@@ -88,12 +87,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         await refetch()
     }
 
-    console.log('PatientProvider state:', {
-        patientsCount: patients?.length || 0,
-        loading: isLoading,
-        error: error ? (error as Error).message : null,
-        enabled: !!user?.organization_id
-    })
+
 
     return (
         <PatientContext.Provider

@@ -8,14 +8,17 @@ const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Explicitly use production credentials
+const supabaseUrl = process.env.NEXT_PUBLIC_PROD_SUPABASE_URL;
+const supabaseServiceKey = process.env.PROD_SUPABASE_SERVICE_ROLE_KEY;
 
+console.log('Using Production Database:');
 console.log(`Supabase URL: ${supabaseUrl}`);
-console.log(`Supabase Service Key: ${supabaseServiceKey}`);
+// Don't log the full key for security
+console.log(`Using service role key: ${supabaseServiceKey ? '✓' : '✗'}`);
 
 if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Missing Supabase URL or Service Role Key in environment variables.');
+    console.error('Missing Supabase Production URL or Service Role Key in environment variables.');
     process.exit(1);
 }
 
@@ -109,7 +112,7 @@ async function seed() {
         // 2. If user exists, delete their data and then delete the user
         const existingUser = existingUsers.users.find(user => user.email === targetEmail);
         if (existingUser) {
-            console.log(`Existing user found: ${targetEmail}. Proceeding to delete their data.`);
+            // console.log(`Existing user found: ${targetEmail}. Proceeding to delete their data.`);
 
             // Fetch all organization memberships for the user
             const { data: userOrgs, error: userOrgsError } = await supabase
@@ -289,7 +292,6 @@ async function seed() {
             throw new Error('No locations were created');
         }
 
-        console.log('Locations created successfully:', createdLocations);
 
         // 8. Create providers associated with the locations
         const providerFirstNames = ['Sarah', 'Michael', 'Emily', 'David', 'Lisa', 'James', 'Maria', 'Robert', 'Laura', 'Kevin'];
@@ -328,7 +330,6 @@ async function seed() {
             throw new Error(`Error creating providers: ${provError.message}`);
         }
 
-        console.log('Providers created successfully:', createdProviders);
 
         // 9. Create patients
         const patientFirstNames = ['John', 'Jane', 'Robert', 'Maria', 'David', 'Sarah', 'Michael', 'Emily', 'William', 'Linda'];
@@ -382,7 +383,6 @@ async function seed() {
             throw new Error(`Error creating patients: ${patError.message}`);
         }
 
-        console.log('Patients created successfully:', createdPatients);
 
         // 10. Create appointments for each patient
         const appointmentStatuses = ['scheduled', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show'];
@@ -430,7 +430,6 @@ async function seed() {
             throw new Error(`Error creating appointments: ${apptError.message}`);
         }
 
-        console.log('Appointments created successfully:', createdAppointments);
 
         // 11. Create emergency contacts for each patient
         const relationships = ['Spouse', 'Parent', 'Sibling', 'Child', 'Friend', 'Guardian'];
@@ -464,7 +463,6 @@ async function seed() {
             throw new Error(`Error creating emergency contacts: ${ecError.message}`);
         }
 
-        console.log('Emergency contacts created successfully:', createdEmergencyContacts);
 
         // 12. Create note templates
         const noteTemplates = [
@@ -519,7 +517,6 @@ async function seed() {
             throw new Error(`Error creating note templates: ${tmplError.message}`);
         }
 
-        console.log('Note templates created successfully:', createdTemplates);
 
         // 13. Create clinical notes for appointments
         const clinicalNotes = [];
@@ -570,7 +567,6 @@ async function seed() {
             throw new Error(`Error creating clinical notes: ${cnError.message}`);
         }
 
-        console.log('Clinical notes created successfully:', createdClinicalNotes);
 
         // 14. Create note sections for clinical notes
         const sectionTypes = ['subjective', 'objective', 'assessment', 'plan'];
@@ -613,7 +609,6 @@ async function seed() {
             throw new Error(`Error creating note sections: ${nsError.message}`);
         }
 
-        console.log('Note sections created successfully:', createdNoteSections);
 
         // 15. Create comments for clinical notes
         const commentContents = [
@@ -656,7 +651,7 @@ async function seed() {
             throw new Error(`Error creating note comments: ${ncError.message}`);
         }
 
-        console.log('Note comments created successfully:', createdNoteComments);
+        // console.log('Note comments created successfully:', createdNoteComments);
 
         console.log('Data seeding completed successfully.');
 

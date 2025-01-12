@@ -12,7 +12,7 @@ interface DeniedClaim {
   dateOfService: string
   amount: number
   reason: string
-  status: 'New' | 'In Progress' | 'Appealed' | 'Resolved'
+  status: "In Progress" | "New" | "Appealed" | "Resolved"
 }
 
 const mockDeniedClaims: DeniedClaim[] = [
@@ -29,7 +29,7 @@ export function DenialManagement() {
   const handleAppeal = () => {
     if (selectedClaim) {
       const updatedClaims = deniedClaims.map(claim =>
-        claim.id === selectedClaim.id ? { ...claim, status: 'Appealed' } : claim
+        claim.id === selectedClaim.id ? { ...claim, status: "Appealed" as const } : claim
       )
       setDeniedClaims(updatedClaims)
       setSelectedClaim(null)

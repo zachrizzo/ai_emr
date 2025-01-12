@@ -11,6 +11,7 @@ CREATE TABLE faxes (
     from_number TEXT NOT NULL,
     to_number TEXT NOT NULL,
     media_url TEXT,
+    srfax_id TEXT,
     pages INTEGER,
     duration INTEGER,
     error_message TEXT,
@@ -24,20 +25,21 @@ ALTER TABLE faxes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view their organization's faxes"
     ON faxes FOR SELECT
-    USING (organization_id = auth.jwt() ->> 'organization_id'::text);
+    USING (organization_id = (auth.jwt() ->> 'organization_id')::uuid);
 
 CREATE POLICY "Users can insert faxes for their organization"
     ON faxes FOR INSERT
-    WITH CHECK (organization_id = auth.jwt() ->> 'organization_id'::text);
+    WITH CHECK (organization_id = (auth.jwt() ->> 'organization_id')::uuid);
 
 CREATE POLICY "Users can update their organization's faxes"
     ON faxes FOR UPDATE
-    USING (organization_id = auth.jwt() ->> 'organization_id'::text);
+    USING (organization_id = (auth.jwt() ->> 'organization_id')::uuid);
 
 -- Create indexes
 CREATE INDEX faxes_organization_id_idx ON faxes(organization_id);
 CREATE INDEX faxes_patient_id_idx ON faxes(patient_id);
 CREATE INDEX faxes_created_at_idx ON faxes(created_at);
+CREATE INDEX faxes_srfax_id_idx ON faxes(srfax_id);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

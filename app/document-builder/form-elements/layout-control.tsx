@@ -1,32 +1,31 @@
 'use client'
 
+import React from 'react'
 import { Button } from '@/components/ui/button'
-import { LayoutType } from '../document-builder-context'
 import { AlignJustify, AlignLeft } from 'lucide-react'
+import { Element } from '../types'
 
 interface LayoutControlProps {
-  layout: LayoutType;
-  onLayoutChange: (layout: LayoutType) => void;
+  layout: Element['layout'];
+  onChange: (layout: Element['layout']) => void;
 }
 
-export function LayoutControl({ layout, onLayoutChange }: LayoutControlProps) {
+export function LayoutControl({ layout, onChange }: LayoutControlProps) {
   return (
-    <div className="flex space-x-2 mb-2">
+    <div className="flex gap-2">
       <Button
-        size="sm"
         variant={layout === 'full' ? 'default' : 'outline'}
-        onClick={() => onLayoutChange('full')}
-        title="Full width"
+        size="sm"
+        onClick={() => onChange('full')}
       >
-        <AlignJustify size={16} />
+        <AlignJustify className="h-4 w-4" />
       </Button>
       <Button
-        size="sm"
         variant={layout === 'half' ? 'default' : 'outline'}
-        onClick={() => onLayoutChange('half')}
-        title="Half width"
+        size="sm"
+        onClick={() => onChange('half')}
       >
-        <AlignLeft size={16} />
+        <AlignLeft className="h-4 w-4" />
       </Button>
     </div>
   )

@@ -44,14 +44,37 @@ export default function LoginPage() {
 
       if (authError) throw authError
 
+      // Verify the session was created
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+
+      console.log("session", session);
+
+      if (!session) {
+        throw new Error('Failed to create session')
+      }
+
+      // Set the session cookie
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       })
 
-      // Redirect to the original requested URL or dashboard
-      const redirectTo = searchParams?.get('redirectTo') || '/'
-      router.push(redirectTo)
+      // Get the redirect URL from searchParams, defaulting to '/'
+      let redirectTo = searchParams?.get('redirectTo')
+      // Clean up the redirect path and default to '/' if empty or invalid
+      redirectTo = redirectTo ? redirectTo.split('@')[0].replace(/\/$/, '') : '/'
+      if (!redirectTo || redirectTo === '/login') {
+        redirectTo = '/'
+      }
+
+      // Use replace instead of push to prevent back button issues
+      router.replace(redirectTo)
     } catch (error: any) {
       console.error('Login error:', error)
       toast({

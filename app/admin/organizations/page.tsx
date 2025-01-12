@@ -63,31 +63,26 @@ export default function OrganizationsPage() {
     }
   }
 
-  const handleUpdateOrganization = async (organization: Organization) => {
+  const handleUpdateOrganization = async (organization: Omit<Organization, "id" | "created_at" | "updated_at">) => {
+    if (!editingOrganization) return;
+
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('organizations')
-        .update({ ...organization })
-        .eq('id', organization.id)
-        .select()
+        .update({
+          ...organization,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingOrganization.id);
 
       if (error) throw error;
 
-      setOrganizations(prev => prev.map(org => org.id === organization.id ? data[0] : org))
-      setEditingOrganization(null)
-      toast({
-        title: 'Success',
-        description: 'Organization updated successfully',
-      })
+      setEditingOrganization(null);
+      fetchOrganizations();
     } catch (error) {
-      console.error('Error updating organization:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to update organization',
-        variant: 'destructive'
-      })
+      console.error('Error updating organization:', error);
     }
-  }
+  };
 
   const handleDeleteOrganization = async () => {
     if (!organizationToDelete) return;
@@ -146,9 +141,9 @@ export default function OrganizationsPage() {
         </CardContent>
       </Card>
       {showForm && (
-        <OrganizationForm 
-          onSubmit={handleCreateOrganization} 
-          onCancel={() => setShowForm(false)} 
+        <OrganizationForm
+          onSubmit={handleCreateOrganization}
+          onCancel={() => setShowForm(false)}
         />
       )}
       {editingOrganization && (

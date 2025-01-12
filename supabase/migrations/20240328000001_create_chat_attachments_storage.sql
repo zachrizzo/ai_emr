@@ -1,6 +1,12 @@
--- Create chat-attachments storage bucket
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('chat-attachments', 'chat-attachments', true);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM storage.buckets WHERE id = 'chat-attachments'
+    ) THEN
+        INSERT INTO storage.buckets (id, name, public)
+        VALUES ('chat-attachments', 'chat-attachments', true);
+    END IF;
+END $$;
 
 -- Allow authenticated users to upload files
 CREATE POLICY "Allow authenticated users to upload files"

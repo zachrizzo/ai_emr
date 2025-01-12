@@ -141,13 +141,22 @@ serve(async (req) => {
                  IMPORTANT FORMATTING INSTRUCTIONS:
                  1. ALWAYS wrap patient names in HTML links using: <a href="/patients/[patient_id]">[Patient Name]</a>
                  2. ALWAYS wrap provider names in HTML links using: <a href="/providers/[provider_id]">[Provider Name]</a>
-                 3. ALWAYS structure your response with HTML tags for better readability
-                 4. Example format:
-                    <h3>Patient Information</h3>
+                 3. When discussing appointments:
+                    - Format dates in a clear, readable format
+                    - Include time with the timezone if available
+                    - Clearly state the appointment status
+                    - Link to both the patient and provider involved
+                 4. ALWAYS structure your response with HTML tags for better readability
+                 5. Example format:
+                    <h3>Appointment Information</h3>
                     <p>Patient: <a href="/patients/123">John Doe</a></p>
                     <p>Provider: <a href="/providers/456">Dr. Smith</a></p>
+                    <p>Date: March 28, 2024 at 2:30 PM</p>
+                    <p>Status: Scheduled</p>
 
-                 Please provide accurate and relevant information while maintaining HIPAA compliance.`
+                 Please provide accurate and relevant information while maintaining HIPAA compliance.
+                 When discussing appointments, always include relevant context such as the reason for visit,
+                 appointment type, and any notes if available.`
     }
 
     // Format conversation history

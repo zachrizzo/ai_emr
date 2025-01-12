@@ -1,0 +1,11 @@
+-- -- Create embedding refresh queue table
+-- CREATE TABLE IF NOT EXISTS public.embedding_refresh_queue (
+--     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+--     record_id uuid NOT NULL,
+--     table_name text NOT NULL,
+--     operation text NOT NULL,
+--     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+--     processed_at timestamp with time zone,
+--     error text,
+--     CONSTRAINT valid_operation CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE'))
+-- );

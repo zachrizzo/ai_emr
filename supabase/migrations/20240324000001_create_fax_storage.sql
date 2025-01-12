@@ -1,6 +1,12 @@
--- Create storage bucket for fax documents
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('fax-documents', 'fax-documents', false);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM storage.buckets WHERE id = 'fax-documents'
+    ) THEN
+        INSERT INTO storage.buckets (id, name, public)
+        VALUES ('fax-documents', 'fax-documents', false);
+    END IF;
+END $$;
 
 -- Allow authenticated users to upload files
 CREATE POLICY "Users can upload fax documents"

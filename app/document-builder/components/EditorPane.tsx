@@ -1,7 +1,7 @@
 import React from 'react'
-import { Sidebar } from '../sidebar'
+import { Sidebar } from './Sidebar'
 import { DropZone } from '../drop-zone'
-import { Element } from '../document-builder-context'
+import { Element } from '../types'
 
 interface EditorPaneProps {
   addElement: (element: Omit<Element, 'id'>) => void

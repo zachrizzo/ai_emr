@@ -1,41 +1,30 @@
 'use client'
 
-import { useDocumentBuilder } from '../document-builder-context'
+import React from 'react'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
 import { LayoutControl } from './layout-control'
+import { Element } from '../types'
 
-export function StaticText({ id, label, description, layout }: { id: string; label: string; description: string; layout: 'full' | 'half' }) {
-  const { updateElement, removeElement } = useDocumentBuilder()
+interface StaticTextProps extends Element {
+  onUpdateElement: (id: string, updates: Partial<Element>) => void;
+}
 
+export function StaticText({ id, label, layout, onUpdateElement }: StaticTextProps) {
   return (
-    <div className="relative pt-8">
-      <div className="absolute top-0 right-0">
-        <LayoutControl 
-          layout={layout} 
-          onLayoutChange={(newLayout) => updateElement(id, { layout: newLayout })} 
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Static Text</h3>
+        <LayoutControl
+          layout={layout}
+          onChange={(newLayout) => onUpdateElement(id, { layout: newLayout })}
         />
       </div>
       <Input
+        type="text"
         value={label}
-        onChange={(e) => updateElement(id, { label: e.target.value })}
-        className="font-bold mb-2"
-        placeholder="Enter title"
+        onChange={(e) => onUpdateElement(id, { label: e.target.value })}
+        placeholder="Enter static text"
       />
-      <Textarea
-        value={description}
-        onChange={(e) => updateElement(id, { description: e.target.value })}
-        className="mb-2"
-        placeholder="Enter text content"
-      />
-      <Button
-        onClick={() => removeElement(id)}
-        variant="destructive"
-        size="sm"
-      >
-        Remove
-      </Button>
     </div>
   )
 }
