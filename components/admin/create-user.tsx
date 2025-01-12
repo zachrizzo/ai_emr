@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { Role } from '@/types/role'
 
 interface CreateUserProps {
@@ -81,7 +81,7 @@ export function CreateUser({ onSuccess, organizationId, roles }: CreateUserProps
         })
 
         onSuccess()
-        
+
         toast({
           title: 'Success',
           description: 'User created successfully'

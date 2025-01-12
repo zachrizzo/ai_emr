@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Bot, Send } from 'lucide-react'
 import { AIConversationList } from './ai-conversation-list'
 import { useToast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 
 interface AIConversation {
   id: string

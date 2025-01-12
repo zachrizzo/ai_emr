@@ -1,62 +1,38 @@
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase";
-
-interface User {
-  id: string;
-  email: string;
-  organization_id: string;
-  full_name: string;
-  role: string;
-}
+import { supabase } from '@/utils/supabase-config'
+import { useEffect, useState } from 'react'
+import { User } from '@supabase/supabase-js'
 
 export function useUser() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient();
-
-    async function getUser() {
+    // Check current auth state
+    const checkUser = async () => {
       try {
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-
-        if (authUser) {
-          const { data: userData, error } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", authUser.id)
-            .single();
-
-          if (error) throw error;
-          setUser(userData);
-        }
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+        setUser(session?.user ?? null)
       } catch (error) {
-        console.error("Error loading user:", error);
-        setUser(null);
+        console.error('Error checking auth state:', error)
+        setUser(null)
       } finally {
-        setIsLoading(false);
+        setLoading(false)
       }
     }
 
-    getUser();
+    checkUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        getUser();
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
 
     return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+      subscription.unsubscribe()
+    }
+  }, [])
 
-  return { user, isLoading };
+  return { user, loading }
 }

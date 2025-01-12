@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DocumentTemplate } from '@/app/document-builder/document-builder-context'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 import { format, addDays } from 'date-fns'
 import { useUser } from '@/contexts/UserContext'

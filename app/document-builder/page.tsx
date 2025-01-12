@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { PlusCircle, UserPlus } from 'lucide-react'
 import { DataGrid } from '@/components/data-grid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { AssignTemplateModal } from '@/components/assign-template-modal'

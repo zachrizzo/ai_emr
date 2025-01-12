@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ConversationList } from './conversation-list';
 import { ConversationView } from './conversation-view';
 import { Conversation, Message } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase-config';
 import { toast } from '@/components/ui/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 

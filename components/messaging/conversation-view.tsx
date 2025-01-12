@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, MoreVertical } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { format } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 
 interface ConversationViewProps {
   conversation: Conversation

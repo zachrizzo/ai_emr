@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AddProviderDialog } from '@/components/add-provider-dialog'
 import { ConfirmDeleteModal } from '@/components/confirm-delete-modal'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"

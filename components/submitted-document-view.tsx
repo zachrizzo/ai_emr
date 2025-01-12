@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FormSubmission } from '@/types'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { format } from 'date-fns'

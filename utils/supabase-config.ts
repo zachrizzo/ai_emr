@@ -1,31 +1,28 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
 
-const isProduction = process.env.IS_PRODUCTION === 'true';
+// Get the correct Supabase URL and key based on environment
+const isProduction = process.env.NEXT_PUBLIC_IS_PRODUCTION === 'true'
 
-// Get the appropriate URLs and keys based on environment
-const supabaseUrl = isProduction
-  ? process.env.PROD_SUPABASE_URL
-  : process.env.NEXT_PUBLIC_SUPABASE_URL;
+const EDGE_FUNCTION_URL = '/functions/v1/'
 
-const supabaseAnonKey = isProduction
-  ? process.env.PROD_SUPABASE_ANON_KEY
-  : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export const getSupabaseConfig = () => {
+  const supabaseUrl = isProduction
+    ? process.env.NEXT_PUBLIC_PROD_SUPABASE_URL!
+    : process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = isProduction
+    ? process.env.NEXT_PUBLIC_PROD_SUPABASE_ANON_KEY!
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const supabaseServiceRoleKey = isProduction
-  ? process.env.PROD_SUPABASE_SERVICE_ROLE_KEY
-  : process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // For edge functions, we need the full URL including the /functions/v1/ path
+  const functionURL = isProduction
+    ? process.env.NEXT_PUBLIC_PROD_SUPABASE_URL! + EDGE_FUNCTION_URL
+    : process.env.NEXT_PUBLIC_SUPABASE_URL! + EDGE_FUNCTION_URL
 
-// Create Supabase client with anonymous key
-export const supabase = createClient(
-  supabaseUrl!,
-  supabaseAnonKey!
-);
+  return { supabaseUrl, supabaseAnonKey, functionURL, isProduction }
+}
 
-// Create Supabase admin client with service role key
-export const supabaseAdmin = createClient(
-  supabaseUrl!,
-  supabaseServiceRoleKey!
-);
-
-// Export environment status
-export const isProd = isProduction;
+// Create the Supabase client for browser usage
+export const supabase = createBrowserClient(
+  getSupabaseConfig().supabaseUrl,
+  getSupabaseConfig().supabaseAnonKey
+)

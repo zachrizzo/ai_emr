@@ -13,9 +13,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { toast } from '@/components/ui/use-toast'
 import { CreateUser } from './create-user'
 import { EditUserDialog } from './edit-user-dialog'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 
-export function UserManagement({ organizationId }: { organizationId: string | null}) {
+export function UserManagement({ organizationId }: { organizationId: string | null }) {
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -102,7 +102,7 @@ export function UserManagement({ organizationId }: { organizationId: string | nu
     const fullName = user.full_name?.toLowerCase() ?? '';
     const email = user.email?.toLowerCase() ?? '';
     const userRoles = user.roles?.map(role => role.name.toLowerCase()) ?? [];
-    
+
     const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
       email.includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || userRoles.includes(roleFilter.toLowerCase());
@@ -293,9 +293,8 @@ export function UserManagement({ organizationId }: { organizationId: string | nu
                   </TableCell>
                   <TableCell>{user.roles?.map(role => role.name).join(', ') || 'No Roles'}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {user.status || 'Unknown'}
                     </span>
                   </TableCell>

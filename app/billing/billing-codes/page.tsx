@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useOrganization } from '@/hooks/use-organization'
+import { useUser } from '@/contexts/UserContext'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
     Table,
@@ -49,18 +49,18 @@ export default function BillingCodesPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>('')
     const [selectedStatus, setSelectedStatus] = useState<string>('active')
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    const { organization } = useOrganization()
+    const { user } = useUser()
     const supabase = createClientComponentClient()
 
     useEffect(() => {
-        if (!organization?.id) return
+        if (!user?.organization_id) return
 
         const fetchData = async () => {
             // Fetch categories
             const { data: categoriesData } = await supabase
                 .from('cpt_categories')
                 .select('*')
-                .eq('organization_id', organization.id)
+                .eq('organization_id', user.organization_id)
                 .order('name')
 
             if (categoriesData) {
@@ -71,7 +71,7 @@ export default function BillingCodesPage() {
             const query = supabase
                 .from('cpt_codes')
                 .select('*')
-                .eq('organization_id', organization.id)
+                .eq('organization_id', user.organization_id)
                 .eq('status', selectedStatus)
 
             if (selectedCategory) {
@@ -100,7 +100,7 @@ export default function BillingCodesPage() {
                     event: '*',
                     schema: 'public',
                     table: 'cpt_codes',
-                    filter: `organization_id=eq.${organization.id}`
+                    filter: `organization_id=eq.${user.organization_id}`
                 },
                 () => fetchData()
             )
@@ -109,7 +109,7 @@ export default function BillingCodesPage() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [organization?.id, searchQuery, selectedCategory, selectedStatus])
+    }, [user?.organization_id, searchQuery, selectedCategory, selectedStatus])
 
     return (
         <div className="container mx-auto py-6">

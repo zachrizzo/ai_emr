@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 
 interface ActivityLog {
@@ -58,7 +58,7 @@ export function ActivityLogs({ organizationId }: { organizationId: string | null
 
   const filteredLogs = logs.filter(log =>
     (log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     log.details.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      log.details.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (filterAction === '' || filterAction === 'all' || log.action === filterAction)
   )
 

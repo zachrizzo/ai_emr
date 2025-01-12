@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useOrganization } from '@/hooks/use-organization'
+import { useUser } from '@/contexts/UserContext'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
     Dialog,
@@ -50,17 +50,17 @@ export function AddBillingCodeDialog({
         effectiveDate: new Date().toISOString().split('T')[0],
     })
 
-    const { organization } = useOrganization()
+    const { user } = useUser()
     const supabase = createClientComponentClient()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!organization?.id) return
+        if (!user?.organization_id) return
 
         setIsSubmitting(true)
         try {
             const { error } = await supabase.from('cpt_codes').insert({
-                organization_id: organization.id,
+                organization_id: user.organization_id,
                 code: formData.code,
                 description: formData.description,
                 long_description: formData.longDescription || null,

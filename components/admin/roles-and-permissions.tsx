@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PlusCircle, Search, Edit, Trash2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 
 interface GroupedPermissions {
   [category: string]: Permission[];
@@ -58,7 +58,7 @@ export function RolesAndPermissions({ organizationId }: { organizationId: string
         .from('permissions')
         .select('*')
       if (error) throw error
-      
+
       const groupedPermissions: GroupedPermissions = {}
       data.forEach((permission: Permission) => {
         const parts = permission.name.split('_')
@@ -66,7 +66,7 @@ export function RolesAndPermissions({ organizationId }: { organizationId: string
         const category = parts[parts.length - 1]
         // Get the action (all parts except the last one)
         const action = parts.slice(0, -1).join(' ')
-        
+
         if (!groupedPermissions[category]) {
           groupedPermissions[category] = []
         }

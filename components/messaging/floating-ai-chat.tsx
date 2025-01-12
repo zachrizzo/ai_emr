@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { format } from 'date-fns'
@@ -33,7 +33,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import DOMPurify from 'isomorphic-dompurify'
-import { useOrganization } from '@/hooks/use-organization'
+import { useUser } from '@/contexts/UserContext'
+import { getSupabaseConfig } from '@/utils/supabase-config'
 
 interface Message {
     role: 'user' | 'assistant'
@@ -51,8 +52,6 @@ interface Conversation {
     updated_at: string
 }
 
-const EDGE_FUNCTION_URL = 'http://127.0.0.1:54321/functions/v1/chatbot-emr'
-
 const messageStyles = {
     // Base styles for the message content
     content: `
@@ -68,7 +67,7 @@ const messageStyles = {
 }
 
 export function FloatingAIChat() {
-    const { organization } = useOrganization()
+    const { userData, loading: userLoading } = useUser()
     const [isOpen, setIsOpen] = useState(false)
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
@@ -85,17 +84,19 @@ export function FloatingAIChat() {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioChunksRef = useRef<Blob[]>([])
+    const { functionURL, isProduction } = getSupabaseConfig()
+    console.log(functionURL, isProduction)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !userLoading && userData?.organization_id) {
             scrollToBottom()
             fetchConversations()
         }
-    }, [isOpen])
+    }, [isOpen, userLoading, userData?.organization_id])
 
     useEffect(() => {
         if (selectedConversation?.messages) {
@@ -144,11 +145,25 @@ export function FloatingAIChat() {
 
     const createNewConversation = async (name: string) => {
         try {
+            if (userLoading) {
+                return // Don't proceed if still loading user
+            }
+
+            if (!userData?.organization_id) {
+                console.error('No organization found for user')
+                toast({
+                    title: 'Error',
+                    description: 'Unable to create conversation. Please try again later.',
+                    variant: 'destructive'
+                })
+                return
+            }
+
             const conversationId = crypto.randomUUID()
             const newConversation = {
                 id: conversationId,
                 name,
-                organization_id: organization?.id,
+                organization_id: userData.organization_id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 messages: []
@@ -159,7 +174,7 @@ export function FloatingAIChat() {
                 .insert({
                     id: conversationId,
                     name,
-                    organization_id: organization?.id,
+                    organization_id: userData.organization_id,
                     created_at: newConversation.created_at,
                     updated_at: newConversation.updated_at
                 })
@@ -426,7 +441,7 @@ export function FloatingAIChat() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedConversation || (!query.trim() && selectedFiles.length === 0)) return
-        if (!organization?.id) {
+        if (!userData?.organization_id) {
             toast({
                 title: 'Error',
                 description: 'No organization selected.',
@@ -488,19 +503,20 @@ export function FloatingAIChat() {
                 message: currentQuery,
                 conversationId: selectedConversation.id,
                 patientId: selectedConversation.patientId,
-                organizationId: organization.id,
+                organizationId: userData.organization_id,
                 attachments: attachmentUrls
             })
 
 
-            // Send message to Edge Function
-            const response = await fetch(EDGE_FUNCTION_URL, {
+            // Send message to Edge Function using dynamic URL
+            const response = await fetch(functionURL! + 'chatbot-emr', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                    'x-client-info': 'ai_emr@0.1.0',
                 },
-                credentials: 'include',
+                credentials: 'omit',
                 mode: 'cors',
                 body: body
             })
@@ -627,7 +643,7 @@ export function FloatingAIChat() {
                                         </div>
                                         <Button
                                             onClick={() => createNewConversation(newConversationName)}
-                                            disabled={!newConversationName.trim() || !organization?.id}
+                                            disabled={!newConversationName.trim()}
                                         >
                                             Create
                                         </Button>

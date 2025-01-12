@@ -1,73 +1,72 @@
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Location } from '@/types'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/components/auth/auth-provider'
+import { supabase } from '@/utils/supabase-config'
+import { useUser } from './UserContext'
 
 interface LocationContextType {
-    locations: Location[]
-    isLoading: boolean
+    locations: Location[] | null
+    loading: boolean
     error: Error | null
-    refetchLocations: () => Promise<void>
+    refreshLocations: () => Promise<void>
 }
 
-const LocationContext = createContext<LocationContextType | undefined>(undefined)
+const LocationContext = createContext<LocationContextType>({
+    locations: null,
+    loading: true,
+    error: null,
+    refreshLocations: async () => { },
+})
 
-export function LocationProvider({ children }: { children: ReactNode }) {
-    const { session } = useAuth()
-    const queryClient = useQueryClient()
+export function LocationProvider({ children }: { children: React.ReactNode }) {
+    const [locations, setLocations] = useState<Location[] | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<Error | null>(null)
+    const { userData } = useUser()
 
-    const {
-        data: locations = [],
-        isLoading,
-        error,
-        refetch
-    } = useQuery({
-        queryKey: ['locations'],
-        queryFn: async () => {
-            const { data: userData } = await supabase
-                .from('users')
-                .select('organization_id')
-                .eq('id', session?.user?.id)
-                .single()
+    const fetchLocations = async () => {
+        if (!userData?.organization_id) {
+            setLocations(null)
+            setLoading(false)
+            return
+        }
 
-            if (!userData?.organization_id) {
-                throw new Error('No organization found')
-            }
-
+        try {
             const { data, error } = await supabase
                 .from('locations')
                 .select('*')
                 .eq('organization_id', userData.organization_id)
                 .is('deleted_at', null)
+                .order('name', { ascending: true })
 
             if (error) throw error
-            return data as Location[]
-        },
-        enabled: !!session?.user?.id
-    })
 
-    const refetchLocations = async () => {
-        await refetch()
+            setLocations(data)
+            setError(null)
+        } catch (error) {
+            console.error('Error fetching locations:', error)
+            setError(error as Error)
+        } finally {
+            setLoading(false)
+        }
     }
 
-    return (
-        <LocationContext.Provider
-            value={{
-                locations,
-                isLoading,
-                error: error as Error | null,
-                refetchLocations
-            }}
-        >
-            {children}
-        </LocationContext.Provider>
-    )
+    useEffect(() => {
+        fetchLocations()
+    }, [userData?.organization_id])
+
+    const value = {
+        locations,
+        loading,
+        error,
+        refreshLocations: fetchLocations,
+    }
+
+    return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>
 }
 
-export function useLocations() {
+export const useLocations = () => {
     const context = useContext(LocationContext)
-    if (context === undefined) {
+    if (!context) {
         throw new Error('useLocations must be used within a LocationProvider')
     }
     return context

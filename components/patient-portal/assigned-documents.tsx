@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 import Link from 'next/link'
 import { useUser } from '@/contexts/UserContext'

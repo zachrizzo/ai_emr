@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from '@/components/ui/use-toast'
 import { AddLocationDialog } from '@/components/add-location-dialog'
 import { ConfirmDeleteModal } from '@/components/confirm-delete-modal'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { Checkbox } from "@/components/ui/checkbox"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/components/auth/auth-provider'

@@ -8,7 +8,7 @@ import React, {
   useEffect,
   useCallback
 } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { v4 as uuidv4 } from 'uuid'
 import type { User } from '@/types/user'
 import { useUser } from '@/contexts/UserContext'

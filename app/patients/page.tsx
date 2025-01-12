@@ -12,7 +12,7 @@ import { PatientForm } from '@/components/patient-form'
 import { Patient } from '@/types'
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { Skeleton } from "@/components/ui/skeleton"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@/contexts/UserContext'

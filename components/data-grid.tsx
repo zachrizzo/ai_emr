@@ -31,7 +31,8 @@ interface DataGridProps<TData, TValue> {
   data: TData[]
   onEdit?: (row: TData) => void
   onDelete?: (selectedRows: TData[]) => void
-  onRowSelectionChange?: (selectedRows: TData[]) => void // Add this prop
+  onRowSelectionChange?: (selectedRows: TData[]) => void
+  filterColumn?: string
 }
 
 export function DataGrid<TData, TValue>({
@@ -39,7 +40,8 @@ export function DataGrid<TData, TValue>({
   data,
   onEdit,
   onDelete,
-  onRowSelectionChange, // Add this prop
+  onRowSelectionChange,
+  filterColumn = 'name'
 }: DataGridProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -82,9 +84,9 @@ export function DataGrid<TData, TValue>({
       <div className="flex items-center justify-between py-4">
         <Input
           placeholder="Filter..."
-          value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
+          value={(table.getColumn(filterColumn)?.getFilterValue() as string) ?? ''}
           onChange={(event) =>
-            table.getColumn('name')?.setFilterValue(event.target.value)
+            table.getColumn(filterColumn)?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -119,9 +121,9 @@ export function DataGrid<TData, TValue>({
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                       {header.column.getCanSort() && (
                         <Button
                           variant="ghost"

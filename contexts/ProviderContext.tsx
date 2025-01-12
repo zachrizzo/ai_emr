@@ -1,73 +1,72 @@
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Provider } from '@/types'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/components/auth/auth-provider'
+import { supabase } from '@/utils/supabase-config'
+import { useUser } from './UserContext'
 
 interface ProviderContextType {
-    providers: Provider[]
-    isLoading: boolean
+    providers: Provider[] | null
+    loading: boolean
     error: Error | null
-    refetchProviders: () => Promise<void>
+    refreshProviders: () => Promise<void>
 }
 
-const ProviderContext = createContext<ProviderContextType | undefined>(undefined)
+const ProviderContext = createContext<ProviderContextType>({
+    providers: null,
+    loading: true,
+    error: null,
+    refreshProviders: async () => { },
+})
 
-export function ProviderProvider({ children }: { children: ReactNode }) {
-    const { session } = useAuth()
-    const queryClient = useQueryClient()
+export function ProviderProvider({ children }: { children: React.ReactNode }) {
+    const [providers, setProviders] = useState<Provider[] | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<Error | null>(null)
+    const { userData } = useUser()
 
-    const {
-        data: providers = [],
-        isLoading,
-        error,
-        refetch
-    } = useQuery({
-        queryKey: ['providers'],
-        queryFn: async () => {
-            const { data: userData } = await supabase
-                .from('users')
-                .select('organization_id')
-                .eq('id', session?.user?.id)
-                .single()
+    const fetchProviders = async () => {
+        if (!userData?.organization_id) {
+            setProviders(null)
+            setLoading(false)
+            return
+        }
 
-            if (!userData?.organization_id) {
-                throw new Error('No organization found')
-            }
-
+        try {
             const { data, error } = await supabase
                 .from('providers')
                 .select('*')
                 .eq('organization_id', userData.organization_id)
                 .is('deleted_at', null)
+                .order('last_name', { ascending: true })
 
             if (error) throw error
-            return data as Provider[]
-        },
-        enabled: !!session?.user?.id
-    })
 
-    const refetchProviders = async () => {
-        await refetch()
+            setProviders(data)
+            setError(null)
+        } catch (error) {
+            console.error('Error fetching providers:', error)
+            setError(error as Error)
+        } finally {
+            setLoading(false)
+        }
     }
 
-    return (
-        <ProviderContext.Provider
-            value={{
-                providers,
-                isLoading,
-                error: error as Error | null,
-                refetchProviders
-            }}
-        >
-            {children}
-        </ProviderContext.Provider>
-    )
+    useEffect(() => {
+        fetchProviders()
+    }, [userData?.organization_id])
+
+    const value = {
+        providers,
+        loading,
+        error,
+        refreshProviders: fetchProviders,
+    }
+
+    return <ProviderContext.Provider value={value}>{children}</ProviderContext.Provider>
 }
 
-export function useProviders() {
+export const useProviders = () => {
     const context = useContext(ProviderContext)
-    if (context === undefined) {
+    if (!context) {
         throw new Error('useProviders must be used within a ProviderProvider')
     }
     return context

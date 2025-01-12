@@ -1,114 +1,83 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { User } from '@supabase/supabase-js'
+import { supabase } from '@/utils/supabase-config'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
 
-type UserType = {
-  id: string
-  email: string
-  role: string
-  organization_id: string
-  created_at: string
-  updated_at: string
-} | null
-
-type UserContextType = {
-  user: UserType
-  setUser: (user: UserType) => void
+interface UserContextType {
+  user: User | null
+  userData: any | null
   loading: boolean
-  signOut: () => Promise<void>
+  error: Error | null
+  refreshUserData: () => Promise<void>
 }
 
 const UserContext = createContext<UserContextType>({
   user: null,
-  setUser: () => { },
+  userData: null,
   loading: true,
-  signOut: async () => { }
+  error: null,
+  refreshUserData: async () => { },
 })
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserType>(null)
+  const [userData, setUserData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
   const router = useRouter()
-  const { session, loading: authLoading } = useAuth()
+  const { user } = useAuth()
 
-  const signOut = async () => {
-    const client = createClient()
-    if (!client) return
-    await client.auth.signOut()
-    setUser(null)
-    router.push('/login')
+  const fetchUserData = async () => {
+    if (!user) {
+      setUserData(null)
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (error) throw error
+
+      setUserData(data)
+      setError(null)
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+      setError(error as Error)
+      if ((error as any)?.status === 401) {
+        router.push('/force-logout')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    let mounted = true
+    fetchUserData()
+  }, [user])
 
-    const fetchUserData = async () => {
-      if (!session?.user) {
-        if (mounted) {
-          setUser(null)
-          setLoading(false)
-        }
-        return
-      }
+  const value = {
+    user,
+    userData,
+    loading,
+    error,
+    refreshUserData: fetchUserData,
+  }
 
-      try {
-        const client = createClient()
-        if (!client) {
-          if (mounted) {
-            setUser(null)
-            setLoading(false)
-          }
-          return
-        }
-
-        const { data: userData, error } = await client
-          .from('users')
-          .select('id, email, role, organization_id, created_at, updated_at')
-          .eq('id', session.user.id)
-          .single()
-
-        if (error) {
-          console.error('Error fetching user data:', error)
-          if (mounted) {
-            setUser(null)
-            setLoading(false)
-          }
-          return
-        }
-
-        if (mounted) {
-          setUser(userData)
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error)
-        if (mounted) {
-          setUser(null)
-          setLoading(false)
-        }
-      }
-    }
-
-    if (!authLoading) {
-      fetchUserData()
-    }
-
-    return () => {
-      mounted = false
-    }
-  }, [session, authLoading])
-
-  return (
-    <UserContext.Provider value={{ user, setUser, loading: loading || authLoading, signOut }}>
-      {children}
-    </UserContext.Provider>
-  )
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>
 }
 
 export const useUser = () => {
-  return useContext(UserContext)
+  const context = useContext(UserContext)
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider')
+  }
+  return context
 }
 

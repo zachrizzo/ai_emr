@@ -10,7 +10,7 @@ import { toast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 
 export function RoleManagement({ organizationId }: { organizationId: string }) {
   const [roles, setRoles] = useState<Role[]>([])

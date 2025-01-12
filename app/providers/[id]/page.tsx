@@ -9,7 +9,7 @@ import { useLocations } from '@/contexts/LocationContext'
 import { Skeleton } from "@/components/ui/skeleton"
 import { EditProviderDialog } from '@/components/edit-provider-dialog'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { useAuth } from '@/components/auth/auth-provider'
 import { useQueryClient } from '@tanstack/react-query'
 import { Provider } from '@/types'

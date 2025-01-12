@@ -1,18 +1,10 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getSupabaseConfig } from "@/utils/supabase-config";
 
 // Define public paths that don't require authentication
 const publicPaths = ['/login', '/signup', '/forgot-password'];
-
-// Get the correct Supabase URL and key based on environment
-const isProduction = process.env.IS_PRODUCTION === 'true';
-const supabaseUrl = isProduction
-  ? process.env.NEXT_PUBLIC_PROD_SUPABASE_URL!
-  : process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = isProduction
-  ? process.env.NEXT_PUBLIC_PROD_SUPABASE_ANON_KEY!
-  : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
@@ -28,6 +20,9 @@ export async function middleware(req: NextRequest) {
   }
 
   const res = NextResponse.next();
+
+  // Get Supabase configuration
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
 
   // Create a server-side Supabase client with the correct configuration
   const supabase = createServerClient(

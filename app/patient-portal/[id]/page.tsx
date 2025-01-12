@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { AssignedDocuments } from '@/components/patient-portal/assigned-documents'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 import { useParams } from 'next/navigation'
 import { SubmittedDocumentView } from '@/components/submitted-document-view'

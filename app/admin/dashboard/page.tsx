@@ -11,7 +11,7 @@ import { SecuritySettings } from '@/components/admin/security-settings'
 import { TeamManagement } from '@/components/admin/team-management'
 import { RolesAndPermissions } from '@/components/admin/roles-and-permissions'
 import { toast } from '@/components/ui/use-toast'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { Skeleton } from '@/components/ui/skeleton'
 
 function LoadingSkeleton() {

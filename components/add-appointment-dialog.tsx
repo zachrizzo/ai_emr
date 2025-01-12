@@ -11,11 +11,13 @@ import { format } from 'date-fns'
 import { useProviders } from '@/contexts/ProviderContext'
 import { useLocations } from '@/contexts/LocationContext'
 import { usePatients } from '@/contexts/PatientContext'
+import { useUser } from '@/contexts/UserContext'
+import { supabase } from '@/utils/supabase-config'
 
 interface AddAppointmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddAppointment: (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => void;
+  onSuccess?: () => void;
   patientId?: string;
 }
 
@@ -30,22 +32,15 @@ const formatStatus = (status: string) => {
 export function AddAppointmentDialog({
   isOpen,
   onClose,
-  onAddAppointment,
+  onSuccess,
   patientId
 }: AddAppointmentDialogProps) {
+
   const { toast } = useToast()
   const { providers = [] } = useProviders()
   const { locations = [] } = useLocations()
   const { patients, loading: patientsLoading, error: patientsError } = usePatients()
-
-  console.log('AddAppointmentDialog state:', {
-    providersCount: providers?.length || 0,
-    locationsCount: locations?.length || 0,
-    patientsCount: patients?.length || 0,
-    isLoading: patientsLoading,
-    patientsError: patientsError?.message,
-    patientId
-  })
+  const { userData } = useUser()
 
   const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'created_at' | 'updated_at'>>({
     patient_id: patientId || '',
@@ -58,7 +53,7 @@ export function AddAppointmentDialog({
     duration_minutes: 30,
     notes: '',
     visit_type: 'in_person',
-    organization_id: ''
+    organization_id: userData?.organization_id || ''
   })
 
   // Reset form when dialog opens/closes or patientId changes
@@ -75,31 +70,53 @@ export function AddAppointmentDialog({
       duration_minutes: 30,
       notes: '',
       visit_type: 'in_person',
-      organization_id: ''
+      organization_id: userData?.organization_id || ''
     }))
-  }, [isOpen, patientId])
+  }, [isOpen, patientId, userData?.organization_id])
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const missingFields = []
 
-    if (!newAppointment.patient_id) missingFields.push('Patient')
-    if (!newAppointment.provider_id) missingFields.push('Provider')
-    if (!newAppointment.appointment_date) missingFields.push('Date and Time')
-    if (!newAppointment.appointment_type) missingFields.push('Appointment Type')
-    if (!newAppointment.reason_for_visit) missingFields.push('Reason for Visit')
+    try {
+      if (!newAppointment.patient_id) missingFields.push('Patient')
+      if (!newAppointment.provider_id) missingFields.push('Provider')
+      if (!newAppointment.appointment_date) missingFields.push('Date and Time')
+      if (!newAppointment.appointment_type) missingFields.push('Appointment Type')
+      if (!newAppointment.reason_for_visit) missingFields.push('Reason for Visit')
 
-    if (missingFields.length > 0) {
+      if (missingFields.length > 0) {
+        toast({
+          title: "Error",
+          description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Create the appointment
+      const { error: createError } = await supabase
+        .from('appointments')
+        .insert([newAppointment])
+
+      if (createError) throw createError
+
+      toast({
+        title: "Success",
+        description: "Appointment added successfully",
+      })
+
+      onSuccess?.()
+      onClose()
+    } catch (error: any) {
+      console.error('Error creating appointment:', error)
       toast({
         title: "Error",
-        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        description: error.message || "Error creating appointment",
         variant: "destructive",
       })
-      return
     }
-
-    onAddAppointment(newAppointment)
-    onClose() // Close the dialog after submitting
   }
 
   const selectedPatient = patients?.find(p => p.id === newAppointment.patient_id)

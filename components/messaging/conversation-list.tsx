@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AddConversationDialog } from './add-conversation-dialog';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase-config';
 import { toast } from '@/components/ui/use-toast';
 
 interface ConversationListProps {

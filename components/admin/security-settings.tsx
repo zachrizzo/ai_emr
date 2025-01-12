@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 
 interface SecuritySettings {
@@ -17,7 +17,7 @@ interface SecuritySettings {
   mfaEnforced: boolean
 }
 
-export function SecuritySettings({organizationId}: { organizationId: string | null }) {
+export function SecuritySettings({ organizationId }: { organizationId: string | null }) {
   const [settings, setSettings] = useState<SecuritySettings>({
     passwordMinLength: 8,
     passwordRequireUppercase: true,
@@ -88,19 +88,19 @@ export function SecuritySettings({organizationId}: { organizationId: string | nu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!organizationId) return;
-  
+
     try {
-        const updates = Object.entries(settings).map(([settingName, settingValue]) => ({
-            setting_name: settingName,
-            setting_value: settingValue,
-            organization_id: organizationId,
-          }));
-        const { data, error } = await supabase.from('system_settings').upsert(updates).select()
+      const updates = Object.entries(settings).map(([settingName, settingValue]) => ({
+        setting_name: settingName,
+        setting_value: settingValue,
+        organization_id: organizationId,
+      }));
+      const { data, error } = await supabase.from('system_settings').upsert(updates).select()
 
       if (error) {
         throw error;
       }
-  
+
       toast({
         title: "Settings Saved",
         description: "Your security settings have been successfully updated.",

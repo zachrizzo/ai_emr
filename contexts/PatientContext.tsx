@@ -1,111 +1,74 @@
 'use client'
 
-import { createContext, useContext } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Patient } from '@/types'
+import { supabase } from '@/utils/supabase-config'
 import { useUser } from './UserContext'
 
-type PatientContextType = {
-    patients: Patient[] | undefined
+interface PatientContextType {
+    patients: Patient[] | null
     loading: boolean
     error: Error | null
-    refetchPatients: () => Promise<void>
+    refreshPatients: () => Promise<void>
 }
 
 const PatientContext = createContext<PatientContextType>({
-    patients: undefined,
+    patients: null,
     loading: true,
     error: null,
-    refetchPatients: async () => { }
+    refreshPatients: async () => { },
 })
 
 export function PatientProvider({ children }: { children: React.ReactNode }) {
-    const { user } = useUser()
-    const supabase = createClient()
+    const [patients, setPatients] = useState<Patient[] | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<Error | null>(null)
+    const { userData } = useUser()
 
+    const fetchPatients = async () => {
+        if (!userData?.organization_id) {
+            setPatients(null)
+            setLoading(false)
+            return
+        }
 
-    const {
-        data: patients,
-        isLoading,
-        error,
-        refetch
-    } = useQuery({
-        queryKey: ['patients', user?.organization_id],
-        queryFn: async () => {
-            if (!user?.organization_id) {
-                console.error('No organization ID available')
-                throw new Error('No organization found for user')
-            }
-
-            console.log('Fetching patients for organization:', user.organization_id)
-
+        try {
             const { data, error } = await supabase
                 .from('patients')
-                .select(`
-                    id,
-                    first_name,
-                    last_name,
-                    date_of_birth,
-                    gender,
-                    address,
-                    phone_number,
-                    email,
-                    preferred_language,
-                    preferred_communication,
-                    cultural_considerations,
-                    created_at,
-                    organization_id
-                `)
-                .eq('organization_id', user.organization_id)
+                .select('*')
+                .eq('organization_id', userData.organization_id)
                 .is('deleted_at', null)
-                .order('first_name')
+                .order('last_name', { ascending: true })
 
-            if (error) {
-                console.error('Error fetching patients:', error)
-                throw error
-            }
+            if (error) throw error
 
-            console.log('Fetched patients:', {
-                count: data?.length || 0,
-                sample: data?.[0] ? {
-                    id: data[0].id,
-                    name: `${data[0].first_name} ${data[0].last_name}`,
-                    org: data[0].organization_id
-                } : null
-            })
-
-            return data as Patient[]
-        },
-        enabled: !!user?.organization_id,
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        gcTime: 1000 * 60 * 30, // 30 minutes
-    })
-
-    const refetchPatients = async () => {
-        console.log('Refetching patients...')
-        await refetch()
+            setPatients(data)
+            setError(null)
+        } catch (error) {
+            console.error('Error fetching patients:', error)
+            setError(error as Error)
+        } finally {
+            setLoading(false)
+        }
     }
 
+    useEffect(() => {
+        fetchPatients()
+    }, [userData?.organization_id])
 
+    const value = {
+        patients,
+        loading,
+        error,
+        refreshPatients: fetchPatients,
+    }
 
-    return (
-        <PatientContext.Provider
-            value={{
-                patients,
-                loading: isLoading,
-                error: error as Error | null,
-                refetchPatients
-            }}
-        >
-            {children}
-        </PatientContext.Provider>
-    )
+    return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>
 }
 
 export const usePatients = () => {
     const context = useContext(PatientContext)
-    if (context === undefined) {
+    if (!context) {
         throw new Error('usePatients must be used within a PatientProvider')
     }
     return context

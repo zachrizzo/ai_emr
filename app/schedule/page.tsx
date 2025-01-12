@@ -16,7 +16,7 @@ import { usePatients } from '@/contexts/PatientContext'
 import { useUser } from '@/contexts/UserContext'
 import { useRouter } from 'next/navigation'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+import { supabase } from '@/utils/supabase-config'
 
 interface FetchError extends Error {
   code?: string;
@@ -37,7 +37,7 @@ export default function SchedulePage() {
   const { locations } = useLocations()
   const { providers } = useProviders()
   const { patients } = usePatients()
-  const { user } = useUser()
+  const { userData } = useUser()
 
   const handleError = (error: unknown, context: string) => {
     console.error(`Error in ${context}:`, error)
@@ -65,7 +65,7 @@ export default function SchedulePage() {
 
   const fetchAppointments = async () => {
     try {
-      if (!user?.organization_id) throw new Error('No organization found for user')
+      if (!userData?.organization_id) throw new Error('No organization found for userData')
 
       let query = supabase
         .from('appointments')
@@ -98,51 +98,16 @@ export default function SchedulePage() {
             name
           )
         `)
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', userData.organization_id)
+        .is('deleted_at', null)
 
-      // Only add provider filter if we have selected providers
-      if (selectedProviders && selectedProviders.length > 0) {
-        console.log('Filtering by providers:', selectedProviders)
-        // Let's verify these providers exist
-        const { data: providerCheck } = await supabase
-          .from('providers')
-          .select('id')
-          .eq('organization_id', user.organization_id)
-          .in('id', selectedProviders)
-
-        console.log('Valid providers found:', providerCheck?.length || 0)
-
-        // Let's check if these providers have any appointments
-        const { data: providerAppointments } = await supabase
-          .from('appointments')
-          .select('id')
-          .eq('organization_id', user.organization_id)
-          .in('provider_id', selectedProviders)
-
-        console.log('Appointments found for selected providers:', providerAppointments?.length || 0)
+      // Add provider filter if selected
+      if (selectedProviders?.length > 0) {
         query = query.in('provider_id', selectedProviders)
       }
 
-      // Only add location filter if we have selected locations
-      if (selectedLocations && selectedLocations.length > 0) {
-        console.log('Filtering by locations:', selectedLocations)
-        // Let's verify these locations exist
-        const { data: locationCheck } = await supabase
-          .from('locations')
-          .select('id')
-          .eq('organization_id', user.organization_id)
-          .in('id', selectedLocations)
-
-        console.log('Valid locations found:', locationCheck?.length || 0)
-
-        // Let's check if these locations have any appointments
-        const { data: locationAppointments } = await supabase
-          .from('appointments')
-          .select('id')
-          .eq('organization_id', user.organization_id)
-          .in('location_id', selectedLocations)
-
-        console.log('Appointments found for selected locations:', locationAppointments?.length || 0)
+      // Add location filter if selected
+      if (selectedLocations?.length > 0) {
         query = query.in('location_id', selectedLocations)
       }
 
@@ -175,9 +140,6 @@ export default function SchedulePage() {
         }
       }) || []
 
-      // Log the full data to see what we're getting
-      console.log('Final appointments data:', transformedData)
-
       return transformedData as Appointment[]
     } catch (error) {
       console.error('Full error:', error)
@@ -201,12 +163,12 @@ export default function SchedulePage() {
 
   // Refetch appointments when filters change
   useEffect(() => {
-    if (user?.organization_id) {
+    if (userData?.organization_id) {
       fetchAppointments()
         .then(setAppointments)
         .catch(error => handleError(error, 'filterAppointments'))
     }
-  }, [selectedProviders, selectedLocations, user?.organization_id])
+  }, [selectedProviders, selectedLocations, userData?.organization_id])
 
   // Set default selections when providers and locations are loaded
   useEffect(() => {
@@ -222,72 +184,18 @@ export default function SchedulePage() {
   }, [locations])
 
   useEffect(() => {
-    if (user?.organization_id) {
+    if (userData?.organization_id) {
       fetchData()
     }
-  }, [user?.organization_id, providers, locations])
+  }, [userData?.organization_id, providers, locations])
 
   const handleAddAppointment = async (newAppointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at' | 'organization_id'>) => {
     try {
-      if (!user?.organization_id) throw new Error('No organization found for user')
-
-      console.log('Adding appointment with:', {
-        patient_id: newAppointment.patient_id,
-        organization_id: user.organization_id
-      })
-
-      // Verify that patient and provider aren't deleted
-      const [patientCheck, providerCheck, locationCheck] = await Promise.all([
-        supabase.from('patients')
-          .select('id, first_name, last_name')
-          .eq('id', newAppointment.patient_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null),
-        supabase.from('providers')
-          .select('id, first_name, last_name')
-          .eq('id', newAppointment.provider_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null),
-        supabase.from('locations')
-          .select('id, name')
-          .eq('id', newAppointment.location_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null)
-      ])
-
-      console.log('Patient check results:', {
-        data: patientCheck.data,
-        error: patientCheck.error,
-        status: patientCheck.status
-      })
-
-      // // Check if patient exists and belongs to organization
-      // if (!patientCheck.data?.length) {
-      //   // Let's verify the patient exists at all
-      //   const { data: patientExists } = await supabase
-      //     .from('patients')
-      //     .select('id, organization_id, deleted_at')
-      //     .eq('id', newAppointment.patient_id)
-      //     .single()
-
-      //   console.log('Patient exists check:', patientExists)
-
-      //   throw new Error('Selected patient not found or does not belong to your organization')
-      // }
-
-      // Check if provider exists and belongs to organization
-      if (!providerCheck.data?.length) {
-        throw new Error('Selected provider not found or does not belong to your organization')
-      }
-
-      // Check if location exists and belongs to organization
-      if (!locationCheck.data?.length) {
-        throw new Error('Selected location not found or does not belong to your organization')
-      }
+      if (!userData?.organization_id) throw new Error('No organization found for userData')
 
       const appointmentWithOrg = {
         ...newAppointment,
-        organization_id: user.organization_id
+        organization_id: userData.organization_id
       }
 
       const { data, error } = await supabase
@@ -317,41 +225,16 @@ export default function SchedulePage() {
 
   const handleEditAppointment = async (updatedAppointment: AppointmentDetails) => {
     try {
-      if (!user?.organization_id) throw new Error('No organization found for user')
-
-      const [patientCheck, providerCheck, locationCheck] = await Promise.all([
-        supabase.from('patients')
-          .select('id')
-          .eq('id', updatedAppointment.patient_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null)
-          .single(),
-        supabase.from('providers')
-          .select('id')
-          .eq('id', updatedAppointment.provider_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null)
-          .single(),
-        updatedAppointment.location_id ? supabase.from('locations')
-          .select('id')
-          .eq('id', updatedAppointment.location_id)
-          .eq('organization_id', user.organization_id)
-          .is('deleted_at', null)
-          .single() : Promise.resolve({ data: null, error: null })
-      ])
-
-      if (patientCheck.error) throw new Error('Selected patient is not available')
-      if (providerCheck.error) throw new Error('Selected provider is not available')
-      if (updatedAppointment.location_id && locationCheck.error) throw new Error('Selected location is not available')
+      if (!userData?.organization_id) throw new Error('No organization found for userData')
 
       const { error } = await supabase
         .from('appointments')
         .update({
           ...updatedAppointment,
-          organization_id: user.organization_id
+          organization_id: userData.organization_id
         })
         .eq('id', updatedAppointment.id)
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', userData.organization_id)
 
       if (error) throw error
 
@@ -387,13 +270,13 @@ export default function SchedulePage() {
 
   const handleDeleteAppointment = async (appointmentId: string) => {
     try {
-      if (!user?.organization_id) throw new Error('No organization found for user')
+      if (!userData?.organization_id) throw new Error('No organization found for userData')
 
       const { error } = await supabase
         .from('appointments')
         .delete()
         .eq('id', appointmentId)
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', userData.organization_id)
 
       if (error) throw error
 
@@ -472,7 +355,7 @@ export default function SchedulePage() {
             appointment_type: selectedAppointment.appointment_type,
             notes: selectedAppointment.notes,
             visit_type: selectedAppointment.visit_type || 'in_person',
-            organization_id: user?.organization_id || '',
+            organization_id: userData?.organization_id || '',
             is_recurring: false
           }}
           providers={providers || []}

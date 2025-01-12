@@ -18,7 +18,7 @@ import { VoiceRecorder } from "@/components/documentation/voice-recorder"
 import { NoteTemplateSelector } from "@/components/documentation/note-template-selector"
 import { AIAssistant } from "@/components/documentation/ai-assistant"
 import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate } from '@/types/notes'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/utils/supabase-config'
 import { format } from 'date-fns'
 import { Mic, MicOff, Trash2, Save, FileText, Sparkles, X } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"

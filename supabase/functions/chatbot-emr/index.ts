@@ -69,8 +69,11 @@ async function imageUrlToBase64(url: string): Promise<string> {
 }
 
 serve(async (req) => {
+  // Get the request origin
+  const origin = req.headers.get('origin')
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response("ok", { headers: corsHeaders(origin) })
   }
 
   try {
@@ -240,7 +243,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ response: aiResponse }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       }
     )
   } catch (error) {
@@ -251,7 +254,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
       }
     )
   }

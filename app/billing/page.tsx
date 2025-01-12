@@ -13,7 +13,7 @@ import { DenialManagement } from './denial-management'
 import { AlertsNotifications } from './alerts-notifications'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { formatCurrency } from '@/lib/utils'
-import { useOrganization } from '@/hooks/use-organization'
+import { useUser } from '@/contexts/UserContext'
 
 export default function BillingDashboard() {
   const [activeTab, setActiveTab] = useState('claims')
@@ -27,17 +27,17 @@ export default function BillingDashboard() {
   })
 
   const supabase = createClientComponentClient()
-  const { organization } = useOrganization()
+  const { user } = useUser()
 
   useEffect(() => {
-    if (!organization?.id) return
+    if (!user?.organization_id) return
 
     const fetchMetrics = async () => {
       // Get total revenue (sum of completed payments for current month)
       const { data: revenueData } = await supabase
         .from('payments')
         .select('amount')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'completed')
         .gte('payment_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
 
@@ -47,7 +47,7 @@ export default function BillingDashboard() {
       const { data: lastMonthRevenue } = await supabase
         .from('payments')
         .select('amount')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'completed')
         .gte('payment_date', new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString())
         .lt('payment_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
@@ -59,14 +59,14 @@ export default function BillingDashboard() {
       const { count: pendingClaims } = await supabase
         .from('insurance_claims')
         .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'pending')
 
       // Get last week's pending claims for comparison
       const { count: lastWeekClaims } = await supabase
         .from('insurance_claims')
         .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'pending')
         .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 
@@ -76,7 +76,7 @@ export default function BillingDashboard() {
       const { data: outstandingData } = await supabase
         .from('invoices')
         .select('balance_due')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'pending')
 
       const outstandingBalance = outstandingData?.reduce((sum, invoice) => sum + invoice.balance_due, 0) || 0
@@ -85,7 +85,7 @@ export default function BillingDashboard() {
       const { data: lastMonthBalance } = await supabase
         .from('invoices')
         .select('balance_due')
-        .eq('organization_id', organization.id)
+        .eq('organization_id', user.organization_id)
         .eq('status', 'pending')
         .lt('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
 
@@ -112,7 +112,7 @@ export default function BillingDashboard() {
           event: '*',
           schema: 'public',
           table: 'payments',
-          filter: `organization_id=eq.${organization.id}`
+          filter: `organization_id=eq.${user.organization_id}`
         },
         () => fetchMetrics()
       )
@@ -122,7 +122,7 @@ export default function BillingDashboard() {
           event: '*',
           schema: 'public',
           table: 'insurance_claims',
-          filter: `organization_id=eq.${organization.id}`
+          filter: `organization_id=eq.${user.organization_id}`
         },
         () => fetchMetrics()
       )
@@ -132,7 +132,7 @@ export default function BillingDashboard() {
           event: '*',
           schema: 'public',
           table: 'invoices',
-          filter: `organization_id=eq.${organization.id}`
+          filter: `organization_id=eq.${user.organization_id}`
         },
         () => fetchMetrics()
       )
@@ -141,9 +141,9 @@ export default function BillingDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [organization?.id])
+  }, [user?.organization_id])
 
-  if (!organization?.id) {
+  if (!user?.organization_id) {
     return <div>Loading...</div>
   }
 
