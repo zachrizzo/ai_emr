@@ -44,3 +44,49 @@ export async function deleteClinicalNote(id: string) {
 
   if (error) throw error
 }
+
+export function subscribeToClinicalNotes(
+  patientId: string,
+  organizationId: string,
+  onInsert: () => void,
+  onUpdate: () => void,
+  onDelete: () => void
+) {
+  const channel = supabase
+    .channel('clinical-notes-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'clinical_notes',
+        filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
+      },
+      () => onInsert()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'clinical_notes',
+        filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
+      },
+      () => onUpdate()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'clinical_notes',
+        filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
+      },
+      () => onDelete()
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}

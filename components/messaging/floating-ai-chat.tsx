@@ -84,8 +84,7 @@ export function FloatingAIChat() {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioChunksRef = useRef<Blob[]>([])
-    const { functionURL, isProduction } = getSupabaseConfig()
-    console.log(functionURL, isProduction)
+    const { functionURL } = getSupabaseConfig()
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -506,7 +505,6 @@ export function FloatingAIChat() {
                 organizationId: userData.organization_id,
                 attachments: attachmentUrls
             })
-
 
             // Send message to Edge Function using dynamic URL
             const response = await fetch(functionURL! + 'chatbot-emr', {

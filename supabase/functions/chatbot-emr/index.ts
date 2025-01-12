@@ -20,23 +20,49 @@ async function getEmbedding(openai: OpenAI, text: string) {
 async function performVectorSearch(
   supabaseClient: any,
   embedding: number[],
+  organizationId: string,
   limit: number = 5
 ) {
-  const { data: similarRecords, error } = await supabaseClient.rpc(
-    'match_records',
-    {
-      query_embedding: embedding,
-      match_threshold: 0.5,
-      match_count: limit
-    }
-  )
+  console.log('Starting vector search with params:', {
+    limit,
+    organizationId,
+    embeddingLength: embedding.length
+  })
 
-  if (error) {
-    console.error('Error performing vector search:', error)
+  try {
+    const { data: similarRecords, error } = await supabaseClient.rpc(
+      'match_records',
+      {
+        match_count: limit,
+        match_threshold: 0.5,
+        organization_filter: organizationId,
+        query_embedding: embedding
+      }
+    )
+
+    if (error) {
+      console.error('Vector search error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return []
+    }
+
+    console.log('Vector search results:', {
+      recordCount: similarRecords?.length || 0,
+      firstRecord: similarRecords?.[0] ? {
+        type: similarRecords[0].record_type,
+        similarity: similarRecords[0].similarity
+      } : null
+    })
+
+    return similarRecords || []
+  } catch (error) {
+    console.error('Unexpected error in vector search:', error)
     return []
   }
-
-  return similarRecords
 }
 
 // Function to convert image URL to base64
@@ -77,7 +103,19 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationId, patientId, attachments } = await req.json()
+    const { message, conversationId, patientId, organizationId, attachments } = await req.json()
+
+    console.log('Request details:', {
+      messageLength: message?.length,
+      conversationId,
+      patientId,
+      organizationId,
+      hasAttachments: !!attachments?.length
+    })
+
+    if (!organizationId) {
+      throw new Error('Organization ID is required for vector search')
+    }
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -114,8 +152,12 @@ serve(async (req) => {
     }
 
     // Perform vector search
+    console.log('Getting embedding for message:', message.substring(0, 100) + '...')
     const messageEmbedding = await getEmbedding(openai, message)
-    const relevantRecords = await performVectorSearch(supabaseClient, messageEmbedding)
+    console.log('Embedding generated, length:', messageEmbedding.length)
+
+    const relevantRecords = await performVectorSearch(supabaseClient, messageEmbedding, organizationId)
+    console.log('Relevant records found:', relevantRecords.length)
 
     // Get all mentioned patients from the search results
     const { data: mentionedPatients, error: patientsError } = await supabaseClient

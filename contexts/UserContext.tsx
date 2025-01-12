@@ -12,6 +12,7 @@ interface UserContextType {
   loading: boolean
   error: Error | null
   refreshUserData: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 const UserContext = createContext<UserContextType>({
@@ -20,6 +21,7 @@ const UserContext = createContext<UserContextType>({
   loading: true,
   error: null,
   refreshUserData: async () => { },
+  signOut: async () => { },
 })
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -27,7 +29,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
 
   const fetchUserData = async () => {
     if (!user) {
@@ -68,6 +70,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     refreshUserData: fetchUserData,
+    signOut,
   }
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>
