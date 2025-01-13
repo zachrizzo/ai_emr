@@ -12,7 +12,7 @@ import { useProviders } from '@/contexts/ProviderContext'
 import { useLocations } from '@/contexts/LocationContext'
 import { usePatients } from '@/contexts/PatientContext'
 import { useUser } from '@/contexts/UserContext'
-import { supabase } from '@/utils/supabase-config'
+import { useAppointments } from '@/contexts/AppointmentContext'
 
 interface AddAppointmentDialogProps {
   isOpen: boolean;
@@ -22,7 +22,6 @@ interface AddAppointmentDialogProps {
 }
 
 const formatStatus = (status: string) => {
-  // Convert snake_case to Title Case and capitalize each word
   return status
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -35,45 +34,45 @@ export function AddAppointmentDialog({
   onSuccess,
   patientId
 }: AddAppointmentDialogProps) {
-
   const { toast } = useToast()
   const { providers = [] } = useProviders()
   const { locations = [] } = useLocations()
   const { patients, loading: patientsLoading, error: patientsError } = usePatients()
   const { userData } = useUser()
+  const { addAppointment } = useAppointments()
 
   const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'created_at' | 'updated_at'>>({
     patient_id: patientId || '',
     provider_id: '',
-    location_id: null,
+    location_id: '',
     appointment_date: '',
-    appointment_type: '',
-    status: 'scheduled',
+    appointment_time: '',
+    visit_type: 'in_person',
     reason_for_visit: '',
     duration_minutes: 30,
+    status: 'scheduled',
+    appointment_type: '',
     notes: '',
-    visit_type: 'in_person',
     organization_id: userData?.organization_id || ''
   })
 
-  // Reset form when dialog opens/closes or patientId changes
   useEffect(() => {
     setNewAppointment(prev => ({
       ...prev,
       patient_id: patientId || '',
       provider_id: '',
-      location_id: null,
+      location_id: '',
       appointment_date: '',
-      appointment_type: '',
-      status: 'scheduled',
+      appointment_time: '',
+      visit_type: 'in_person',
       reason_for_visit: '',
       duration_minutes: 30,
+      status: 'scheduled',
+      appointment_type: '',
       notes: '',
-      visit_type: 'in_person',
       organization_id: userData?.organization_id || ''
     }))
   }, [isOpen, patientId, userData?.organization_id])
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,18 +94,7 @@ export function AddAppointmentDialog({
         return
       }
 
-      // Create the appointment
-      const { error: createError } = await supabase
-        .from('appointments')
-        .insert([newAppointment])
-
-      if (createError) throw createError
-
-      toast({
-        title: "Success",
-        description: "Appointment added successfully",
-      })
-
+      await addAppointment(newAppointment)
       onSuccess?.()
       onClose()
     } catch (error: any) {
@@ -142,7 +130,7 @@ export function AddAppointmentDialog({
                 value={newAppointment.patient_id}
                 onValueChange={(value) => setNewAppointment({ ...newAppointment, patient_id: value })}
                 required
-                disabled={patientsLoading || !!patientId} // Disable if patientId is provided
+                disabled={patientsLoading || !!patientId}
               >
                 <SelectTrigger className="w-full">
                   {selectedPatient ? (
@@ -176,7 +164,7 @@ export function AddAppointmentDialog({
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {providers?.map((provider) => (
+                  {providers.map((provider) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       {`${provider.first_name} ${provider.last_name}`}
                     </SelectItem>
@@ -184,70 +172,40 @@ export function AddAppointmentDialog({
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label htmlFor="location">Location</Label>
               <Select
-                value={newAppointment.location_id || ''}
-                onValueChange={(value) => setNewAppointment({ ...newAppointment, location_id: value === 'none' ? null : value })}
+                value={newAppointment.location_id}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, location_id: value })}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No location</SelectItem>
-                  {locations?.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="appointment_date">Date and Time *</Label>
-              <Input
-                id="appointment_date"
-                type="datetime-local"
-                value={newAppointment.appointment_date}
-                onChange={(e) => setNewAppointment({ ...newAppointment, appointment_date: e.target.value })}
-                required
-                className="w-full"
-              />
-            </div>
-            <div>
               <Label htmlFor="appointment_type">Appointment Type *</Label>
-              <Input
-                id="appointment_type"
-                value={newAppointment.appointment_type}
-                onChange={(e) => setNewAppointment({ ...newAppointment, appointment_type: e.target.value })}
-                required
-                className="w-full"
-              />
-            </div>
-            <div>
-              <Label htmlFor="duration_minutes">Duration (minutes)</Label>
-              <Input
-                id="duration_minutes"
-                type="number"
-                value={newAppointment.duration_minutes}
-                onChange={(e) => setNewAppointment({ ...newAppointment, duration_minutes: parseInt(e.target.value, 10) || 30 })}
-                className="w-full"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="visit_type">Visit Type</Label>
               <Select
-                value={newAppointment.visit_type}
-                onValueChange={(value) => setNewAppointment({ ...newAppointment, visit_type: value as Appointment['visit_type'] })}
+                value={newAppointment.appointment_type}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, appointment_type: value })}
+                required
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select visit type" />
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in_person">In Person</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
+                  {['New Patient', 'Follow Up', 'Consultation', 'Physical', 'Urgent'].map((type) => (
+                    <SelectItem key={type} value={type.toLowerCase()}>
+                      {type}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -255,22 +213,60 @@ export function AddAppointmentDialog({
               <Label htmlFor="status">Status</Label>
               <Select
                 value={newAppointment.status}
-                onValueChange={(value) => setNewAppointment({ ...newAppointment, status: value as Appointment['status'] })}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, status: value })}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select status">
-                    {newAppointment.status ? formatStatus(newAppointment.status) : 'Select status'}
-                  </SelectValue>
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="checked_in">Checked In</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="no_show">No Show</SelectItem>
+                  {['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show'].map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {formatStatus(status)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label htmlFor="visit_type">Visit Type</Label>
+              <Select
+                value={newAppointment.visit_type}
+                onValueChange={(value) => setNewAppointment({ ...newAppointment, visit_type: value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select visit type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['in_person', 'telehealth', 'home_visit'].map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {formatStatus(type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="appointment_date">Date and Time *</Label>
+              <Input
+                type="datetime-local"
+                id="appointment_date"
+                value={newAppointment.appointment_date}
+                onChange={(e) => setNewAppointment({ ...newAppointment, appointment_date: e.target.value })}
+                required
+                className="w-full"
+              />
+            </div>
+            <div>
+              <Label htmlFor="duration">Duration (minutes)</Label>
+              <Input
+                type="number"
+                id="duration"
+                value={newAppointment.duration_minutes}
+                onChange={(e) => setNewAppointment({ ...newAppointment, duration_minutes: parseInt(e.target.value) })}
+                min={15}
+                step={15}
+                className="w-full"
+              />
             </div>
           </div>
           <div>
@@ -301,4 +297,5 @@ export function AddAppointmentDialog({
     </Dialog>
   )
 }
+
 

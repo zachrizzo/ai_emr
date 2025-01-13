@@ -2,6 +2,7 @@ import './globals.css'
 import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import { FloatingAIChat } from '@/components/messaging/floating-ai-chat'
+import { AppointmentProvider } from '@/contexts/AppointmentContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,10 +19,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ClientProviders>
-          {children}
-          <FloatingAIChat />
-        </ClientProviders>
+        <AppointmentProvider>
+          <ClientProviders>
+            {children}
+            <FloatingAIChat />
+          </ClientProviders>
+        </AppointmentProvider>
       </body>
     </html>
   )

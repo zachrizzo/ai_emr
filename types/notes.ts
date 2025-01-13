@@ -6,14 +6,13 @@ export type AccessAction = 'view' | 'edit' | 'sign' | 'print' | 'share';
 export interface NoteTemplate {
   id: string;
   name: string;
-  content: string;
-  specialty?: string;
-  category?: string;
+  content: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
   organization_id: string;
-  created_by: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface ClinicalNote {
@@ -144,4 +143,83 @@ export interface UpdateClinicalNoteParams {
   tags?: string[];
   sections?: Omit<NoteSection, 'id' | 'note_id' | 'created_at' | 'updated_at'>[];
   status?: NoteStatus;
+}
+
+export interface SessionNote {
+  id: string;
+  patient_id: string;
+  provider_id: string;
+  appointment_id?: string;
+  organization_id: string;
+  content: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
+  type?: 'voice' | 'manual' | 'template' | 'ai_assisted';
+  status?: 'draft' | 'final' | 'signed' | 'amended';
+  version?: number;
+  template_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Appointment {
+  id: string;
+  patient_id: string;
+  provider_id: string;
+  location_id: string;
+  appointment_date: string;
+  appointment_time: string;
+  visit_type: string;
+  reason_for_visit: string;
+  duration_minutes: number;
+  status: string;
+  appointment_type: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  organization_id: string;
+  patient?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
+  provider?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  age?: number;
+  medical_history?: any[];
+  medications?: any[];
+}
+
+export interface CreateSessionNoteParams {
+  patient_id: string;
+  provider_id: string;
+  appointment_id?: string;
+  organization_id: string;
+  content: SessionNote['content'];
+  template_id?: string;
+}
+
+export interface UpdateSessionNoteParams {
+  content?: SessionNote['content'];
+  status?: SessionNote['status'];
+  version?: number;
+  template_id?: string;
 }

@@ -3,8 +3,14 @@ interface SpeechRecognitionErrorEvent extends Event {
 }
 
 interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
   resultIndex: number;
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      }
+    }
+  };
 }
 
 interface SpeechRecognitionResultList {
@@ -31,8 +37,8 @@ interface SpeechRecognition extends EventTarget {
   lang: string;
   onresult: (event: SpeechRecognitionEvent) => void;
   onerror: (event: SpeechRecognitionErrorEvent) => void;
-  start(): void;
-  stop(): void;
+  start: () => void;
+  stop: () => void;
   abort(): void;
 }
 
@@ -42,7 +48,7 @@ interface SpeechRecognitionConstructor {
 
 declare global {
   interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    SpeechRecognition: SpeechRecognitionConstructor;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
   }
 }

@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,7 +14,7 @@ import { useUser } from '@/contexts/UserContext'
 import { useProviders } from '@/contexts/ProviderContext'
 import { useLocations } from '@/contexts/LocationContext'
 import { usePatients } from '@/contexts/PatientContext'
-import { supabase } from '@/utils/supabase-config'
+import { useAppointments } from '@/contexts/AppointmentContext'
 
 interface AppointmentsTabProps {
   patientId: string
@@ -23,99 +25,30 @@ export function AppointmentsTab({ patientId }: AppointmentsTabProps) {
   const { userData } = useUser()
   const { providers } = useProviders()
   const { locations } = useLocations()
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { appointments, isLoading, fetchAppointments, addAppointment, updateAppointment, deleteAppointment } = useAppointments()
   const [isAddingAppointment, setIsAddingAppointment] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
 
   useEffect(() => {
     if (userData?.organization_id) {
-      fetchAppointments()
+      fetchAppointments(patientId)
     }
   }, [patientId, userData?.organization_id])
 
-  const fetchAppointments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          patient:patients(id, first_name, last_name),
-          provider:providers(id, first_name, last_name),
-          location:locations(id, name)
-        `)
-        .eq('patient_id', patientId)
-        .eq('organization_id', userData?.organization_id)
-        .is('deleted_at', null)
-        .order('appointment_date', { ascending: true })
-
-      if (error) throw error
-      setAppointments(data || [])
-      setIsLoading(false)
-    } catch (error: any) {
-      console.error('Error fetching appointments:', error)
-      toast({
-        title: "Error",
-        description: error.message || "Error fetching appointments",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleUpdateAppointment = async (updatedAppointment: AppointmentDetails) => {
     try {
-      if (!userData?.organization_id) throw new Error('No organization found for userData')
-
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          ...updatedAppointment,
-          organization_id: userData.organization_id
-        })
-        .eq('id', updatedAppointment.id)
-        .eq('organization_id', userData.organization_id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Appointment updated successfully.",
-      })
-      fetchAppointments()
+      await updateAppointment(updatedAppointment.id, updatedAppointment)
+      setEditingAppointment(null)
     } catch (error) {
       console.error("Error updating appointment:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update appointment. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setEditingAppointment(null)
     }
   }
 
   const handleDeleteAppointments = async (selectedRows: Appointment[]) => {
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ deleted_at: new Date().toISOString() })
-        .in('id', selectedRows.map(row => row.id))
-        .eq('organization_id', userData?.organization_id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Appointments deleted successfully",
-      })
-      fetchAppointments()
-    } catch (error: any) {
+      await Promise.all(selectedRows.map(row => deleteAppointment(row.id)))
+    } catch (error) {
       console.error('Error deleting appointments:', error)
-      toast({
-        title: "Error",
-        description: error.message || "Error deleting appointments",
-        variant: "destructive",
-      })
     }
   }
 
@@ -163,7 +96,10 @@ export function AppointmentsTab({ patientId }: AppointmentsTabProps) {
       <AddAppointmentDialog
         isOpen={isAddingAppointment}
         onClose={() => setIsAddingAppointment(false)}
-        onSuccess={fetchAppointments}
+        onSuccess={() => {
+          setIsAddingAppointment(false)
+          fetchAppointments(patientId)
+        }}
         patientId={patientId}
       />
       {editingAppointment && (

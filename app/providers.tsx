@@ -8,6 +8,7 @@ import { UserProvider } from '@/contexts/UserContext'
 import { LocationProvider } from '@/contexts/LocationContext'
 import { ProviderProvider } from '@/contexts/ProviderContext'
 import { PatientProvider } from '@/contexts/PatientContext'
+import { AppointmentProvider } from '@/contexts/AppointmentContext'
 import { Toaster } from '@/components/ui/toaster'
 import { AppLayout } from '@/components/layout/app-layout'
 
@@ -31,10 +32,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
                     <LocationProvider>
                         <ProviderProvider>
                             <PatientProvider>
-                                <AppLayout>
-                                    {children}
-                                </AppLayout>
-                                <Toaster />
+                                <AppointmentProvider>
+                                    <AppLayout>
+                                        {children}
+                                    </AppLayout>
+                                    <Toaster />
+                                </AppointmentProvider>
                             </PatientProvider>
                         </ProviderProvider>
                     </LocationProvider>

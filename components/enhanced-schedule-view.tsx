@@ -4,13 +4,13 @@ import React, { useMemo, useState } from 'react'
 import { addDays, format, startOfWeek, startOfMonth, endOfWeek, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, parseISO, isToday } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { Appointment } from '@/types'
+import { Appointment } from '@/types/notes'
 import { AppointmentDetailsPopup } from '@/components/appointment-details-popup'
 import { MultiSelect } from '@/components/ui/multi-select'
 import { useLocations } from '@/contexts/LocationContext'
 import { useProviders } from '@/contexts/ProviderContext'
 
-interface EnhancedScheduleViewProps {
+export interface EnhancedScheduleViewProps {
   appointments: Appointment[]
   view: 'month' | 'week' | 'day'
   onAddAppointment: () => void
@@ -21,6 +21,7 @@ interface EnhancedScheduleViewProps {
   selectedLocations: string[]
   onSelectProviders: (providers: string[]) => void
   onSelectLocations: (locations: string[]) => void
+  isLoading?: boolean
 }
 
 export function EnhancedScheduleView({
@@ -33,7 +34,8 @@ export function EnhancedScheduleView({
   selectedProviders,
   selectedLocations,
   onSelectProviders,
-  onSelectLocations
+  onSelectLocations,
+  isLoading
 }: EnhancedScheduleViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const { locations } = useLocations()
