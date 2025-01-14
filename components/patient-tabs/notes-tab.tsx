@@ -202,12 +202,38 @@ export function NotesTab({
         }
     }
 
-    const handleVoiceRecordingComplete = (transcript: string) => {
+    const handleVoiceRecordingComplete = (sections: {
+        subjective?: string;
+        objective?: string;
+        assessment?: string;
+        plan?: string;
+    }) => {
+        // Save current content to undo history for each section
+        Object.keys(sections).forEach((section) => {
+            const key = section as keyof typeof sections;
+            if (sections[key]) {
+                setUndoHistory(prev => ({
+                    ...prev,
+                    [key]: [...(prev[key] || []), noteContent[key]]
+                }));
+            }
+        });
+
+        // Update each section's content
         setNoteContent(prevContent => ({
             ...prevContent,
-            subjective: prevContent.subjective + '<p>' + transcript + '</p>'
-        }))
-    }
+            ...Object.keys(sections).reduce((acc, section) => {
+                const key = section as keyof typeof sections;
+                if (sections[key]) {
+                    acc[key] = sections[key]!;
+                }
+                return acc;
+            }, {} as typeof prevContent)
+        }));
+
+        // Reset recording state
+        setIsRecording(false);
+    };
 
     const handleTemplateSelect = (template: NoteTemplate | null) => {
         setSelectedTemplate(template)
@@ -381,8 +407,7 @@ export function NotesTab({
                                         <div className="border rounded-lg p-4 bg-muted/50 mb-4">
                                             <VoiceRecorder
                                                 isRecording={isRecording}
-                                                onStartRecording={() => setIsRecording(true)}
-                                                onStopRecording={() => setIsRecording(false)}
+                                                onToggleRecording={() => setIsRecording(!isRecording)}
                                                 onTranscriptionComplete={handleVoiceRecordingComplete}
                                             />
                                         </div>
