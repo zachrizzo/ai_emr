@@ -121,6 +121,14 @@
   @apply p-4 min-h-[200px] outline-none;
 }
 
+.ProseMirror p.is-editor-empty:first-child::before {
+  @apply text-muted-foreground;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
 .ProseMirror > * + * {
   @apply mt-4;
 }

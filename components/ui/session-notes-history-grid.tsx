@@ -1,5 +1,5 @@
 import React from 'react'
-import { SessionNote } from '@/types/notes'
+import { ClinicalNote } from '@/types/notes'
 import {
     ColumnDef,
     flexRender,
@@ -22,15 +22,15 @@ import { Input } from "@/components/ui/input"
 import { format } from 'date-fns'
 
 interface SessionNotesHistoryGridProps {
-    notes: SessionNote[]
-    onSelectNote: (note: SessionNote) => void
+    notes: ClinicalNote[]
+    onSelectNote: (note: ClinicalNote) => void
 }
 
 export function SessionNotesHistoryGrid({ notes, onSelectNote }: SessionNotesHistoryGridProps) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [globalFilter, setGlobalFilter] = React.useState('')
 
-    const columns: ColumnDef<SessionNote>[] = [
+    const columns: ColumnDef<ClinicalNote>[] = [
         {
             accessorKey: 'created_at',
             header: 'Date',

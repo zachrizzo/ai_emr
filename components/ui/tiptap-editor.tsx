@@ -6,6 +6,7 @@ import Highlight from '@tiptap/extension-highlight'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import CodeBlock from '@tiptap/extension-code-block'
+import Placeholder from '@tiptap/extension-placeholder'
 import { Button } from "@/components/ui/button"
 import { Bold, Italic, List, ListOrdered, Heading2, Strikethrough, Code, CheckSquare, Quote } from 'lucide-react'
 import { useEffect } from 'react'
@@ -80,6 +81,10 @@ export function TipTapEditor({ content, onChange, editable = true, placeholder }
                 HTMLAttributes: {
                     class: 'rounded-md bg-muted p-4 font-mono text-sm',
                 },
+            }),
+            Placeholder.configure({
+                placeholder: placeholder || 'Start typing...',
+                emptyEditorClass: 'is-editor-empty',
             }),
         ],
         content: markdownToHtml(content),
@@ -196,12 +201,9 @@ export function TipTapEditor({ content, onChange, editable = true, placeholder }
                     <Code className="h-3.5 w-3.5" />
                 </Button>
             </div>
-            <EditorContent editor={editor} className="p-3" />
-            {placeholder && !content && (
-                <div className="absolute top-0 left-0 p-4 text-gray-400 pointer-events-none">
-                    {placeholder}
-                </div>
-            )}
+            <div className="relative">
+                <EditorContent editor={editor} className="p-3" />
+            </div>
         </div>
     )
 }

@@ -17,7 +17,7 @@ import { NotesHistory } from "@/components/ui/notes-history"
 import { VoiceRecorder } from "@/components/ui/voice-recorder"
 import { NoteTemplateSelector } from "@/components/ui/note-template-selector"
 import { AIAssistant } from "@/components/ui/ai-assistant"
-import { Patient, Appointment, SessionNote, CreateSessionNoteParams, UpdateSessionNoteParams, NoteTemplate } from '@/types/notes'
+import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate, SessionNote } from '@/types'
 import { format } from 'date-fns'
 import { Mic, MicOff, Save, FileText, Sparkles, X, ChevronLeft, ChevronRight, Search, ArrowLeft } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"
@@ -37,37 +37,64 @@ import { Label } from "@/components/ui/label"
 import { SessionNotesHistoryGrid } from "@/components/ui/session-notes-history-grid"
 import { NoteViewer } from "@/components/ui/note-viewer"
 import { supabase } from '@/utils/supabase-config'
-import { getClinicalNotes, deleteClinicalNote, subscribeToClinicalNotes } from '@/lib/services/clinical-notes'
+import { getClinicalNotes, deleteClinicalNote, subscribeToClinicalNotes, createClinicalNote } from '@/lib/services/clinical-notes'
 import { useAppointments } from '@/contexts/AppointmentContext'
 import { useUser } from '@/contexts/UserContext'
 import { cn } from "@/lib/utils"
+import { Appointment } from '@/types/notes'
+
+type NoteSection = 'subjective' | 'objective' | 'assessment' | 'plan'
+
+type NoteContent = {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+}
+
+type UndoHistory = {
+    subjective: string[];
+    objective: string[];
+    assessment: string[];
+    plan: string[];
+}
 
 interface NotesTabProps {
     patientId: string
     providerId: string
-    organizationId: string
-    activeNote: SessionNote | null
-    onCreateNote: (note: CreateSessionNoteParams) => Promise<void>
-    onUpdateNote: (noteId: string, note: UpdateSessionNoteParams) => Promise<void>
-    onEditNote: (note: SessionNote | null) => void
+    activeNote: ClinicalNote | null
+    onUpdateNote: (noteId: string, note: UpdateClinicalNoteParams) => Promise<void>
+    onEditNote: (note: ClinicalNote | null) => void
 }
 
 export function NotesTab({
     patientId,
     providerId,
-    organizationId,
     activeNote,
-    onCreateNote,
     onUpdateNote,
     onEditNote
 }: NotesTabProps) {
-    const { userData } = useUser()
-    const [notes, setNotes] = useState<SessionNote[]>([])
+    const { userData, loading: userLoading } = useUser()
+    const [notes, setNotes] = useState<ClinicalNote[]>([])
     const [templates, setTemplates] = useState<NoteTemplate[]>([])
-    const { appointments, isLoading: isLoadingAppointments, fetchAppointments } = useAppointments()
+    const appointmentContext = useAppointments()
+    const appointments = Array.isArray(appointmentContext?.appointments)
+        ? appointmentContext.appointments as Appointment[]
+        : []
+    const isLoadingAppointments = appointmentContext?.isLoading ?? false
+    const fetchAppointments = appointmentContext?.fetchAppointments ?? (async () => { })
+
+    const findAppointment = (appointmentId?: string): Appointment | null => {
+        if (!appointmentId || !appointments?.length) return null
+        return appointments.find(apt => apt.id === appointmentId) ?? null
+    }
+
+    // Use organization ID from user data as source of truth
+    const organizationId = userData?.organization_id
+
     const [selectedTemplate, setSelectedTemplate] = useState<NoteTemplate | null>(null)
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
-    const [noteContent, setNoteContent] = useState<SessionNote['content']>({
+    const [noteContent, setNoteContent] = useState<NoteContent>({
         subjective: '',
         objective: '',
         assessment: '',
@@ -75,40 +102,66 @@ export function NotesTab({
     })
     const [isRecording, setIsRecording] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
-    const [noteToDelete, setNoteToDelete] = useState<SessionNote | null>(null)
+    const [noteToDelete, setNoteToDelete] = useState<ClinicalNote | null>(null)
     const [showSidebar, setShowSidebar] = useState(true)
-    const [undoHistory, setUndoHistory] = useState<{ [key: string]: string[] }>({
+    const [undoHistory, setUndoHistory] = useState<UndoHistory>({
         subjective: [],
         objective: [],
         assessment: [],
         plan: [],
     })
     const [isCreatingNewNote, setIsCreatingNewNote] = useState(false)
-    const [selectedNote, setSelectedNote] = useState<SessionNote | null>(null)
+    const [selectedNote, setSelectedNote] = useState<ClinicalNote | null>(null)
 
     useEffect(() => {
-        if (userData?.organization_id) {
-            loadNotes()
-            loadTemplates()
-            fetchAppointments(patientId)
+        console.log('Appointments context:', appointments)
+    }, [appointments])
 
-            const unsubscribe = subscribeToClinicalNotes(
-                patientId,
-                organizationId,
-                () => loadNotes(),
-                () => loadNotes(),
-                () => loadNotes()
-            )
+    useEffect(() => {
+        // Wait for user data to load
+        if (userLoading) return
 
-            return () => {
-                unsubscribe()
-            }
+        if (!organizationId) {
+            toast({
+                title: 'Error',
+                description: 'Please log in with an organization account.',
+                variant: 'destructive'
+            })
+            return
         }
-    }, [patientId, organizationId, userData?.organization_id])
+
+        loadNotes()
+        loadTemplates()
+        // Fetch appointments when component mounts
+        fetchAppointments(patientId)
+
+        const unsubscribe = subscribeToClinicalNotes(
+            patientId,
+            organizationId,
+            () => loadNotes(),
+            () => loadNotes(),
+            () => loadNotes()
+        )
+
+        return () => {
+            unsubscribe()
+        }
+    }, [patientId, organizationId, userLoading])
 
     async function loadNotes() {
+        if (!organizationId) {
+            toast({
+                title: 'Error',
+                description: 'Please log in with an organization account.',
+                variant: 'destructive',
+            })
+            return
+        }
+
         try {
+            console.log('Loading notes for patient:', patientId)
             const data = await getClinicalNotes(patientId, organizationId)
+            console.log('Loaded notes:', data)
             setNotes(data)
             setIsLoading(false)
         } catch (error) {
@@ -122,6 +175,15 @@ export function NotesTab({
     }
 
     async function loadTemplates() {
+        if (!organizationId) {
+            toast({
+                title: 'Error',
+                description: 'Please log in with an organization account.',
+                variant: 'destructive',
+            })
+            return
+        }
+
         try {
             const { data, error } = await supabase
                 .from('note_templates')
@@ -133,10 +195,33 @@ export function NotesTab({
             setTemplates(data || [])
         } catch (error) {
             console.error('Error loading templates:', error)
+            toast({
+                title: 'Error',
+                description: 'Failed to load templates. Please try again.',
+                variant: 'destructive',
+            })
         }
     }
 
     const handleCreateNote = async () => {
+        if (!organizationId) {
+            toast({
+                title: 'Error',
+                description: 'Please log in with an organization account.',
+                variant: 'destructive'
+            })
+            return
+        }
+
+        if (isLoadingAppointments) {
+            toast({
+                title: 'Loading',
+                description: 'Please wait while appointments are being loaded.',
+                variant: 'default'
+            })
+            return
+        }
+
         if (!selectedAppointment) {
             toast({
                 title: 'Error',
@@ -147,15 +232,30 @@ export function NotesTab({
         }
 
         try {
-            const newNote: CreateSessionNoteParams = {
+            console.log('Creating note with data:', {
+                selectedAppointment,
+                patientId,
+                providerId,
+                organizationId,
+                noteContent,
+                selectedTemplate: selectedTemplate?.id
+            })
+
+            const newNote: CreateClinicalNoteParams = {
                 appointment_id: selectedAppointment.id,
                 patient_id: patientId,
                 provider_id: providerId,
                 organization_id: organizationId,
                 content: noteContent,
-                template_id: selectedTemplate?.id
+                type: 'manual',
+                tags: [],
+                ...(selectedTemplate?.id ? { template_id: selectedTemplate.id } : {})
             }
-            await onCreateNote(newNote)
+
+            console.log('Formatted note to save:', JSON.stringify(newNote, null, 2))
+            const createdNote = await createClinicalNote(newNote)
+            console.log('Note saved successfully:', createdNote)
+
             setNoteContent({
                 subjective: '',
                 objective: '',
@@ -165,15 +265,15 @@ export function NotesTab({
             setSelectedTemplate(null)
             setSelectedAppointment(null)
             toast({
-                title: 'Session note created successfully!',
+                title: 'Clinical note created successfully!',
                 variant: 'default'
             })
-            loadNotes()
+            await loadNotes()
         } catch (error) {
-            console.error('Error creating session note:', error)
+            console.error('Error creating clinical note:', error)
             toast({
-                title: 'Error creating session note',
-                description: 'An unexpected error occurred.',
+                title: 'Error creating clinical note',
+                description: error instanceof Error ? error.message : 'An unexpected error occurred.',
                 variant: 'destructive'
             })
         }
@@ -183,57 +283,55 @@ export function NotesTab({
         if (!selectedNote) return
 
         try {
-            await onUpdateNote(selectedNote.id, {
+            const updateData: UpdateClinicalNoteParams = {
                 content: noteContent,
-            })
+                status: selectedNote.status,
+                metadata: selectedNote.metadata,
+                tags: selectedNote.tags
+            }
+
+            await onUpdateNote(selectedNote.id, updateData)
             toast({
-                title: 'Session note updated successfully!',
+                title: 'Clinical note updated successfully!',
                 variant: 'default'
             })
             setSelectedNote(null)
             loadNotes()
         } catch (error) {
-            console.error('Error updating session note:', error)
+            console.error('Error updating clinical note:', error)
             toast({
-                title: 'Error updating session note',
-                description: 'An unexpected error occurred.',
+                title: 'Error updating clinical note',
+                description: error instanceof Error ? error.message : 'An unexpected error occurred.',
                 variant: 'destructive'
             })
         }
     }
 
-    const handleVoiceRecordingComplete = (sections: {
-        subjective?: string;
-        objective?: string;
-        assessment?: string;
-        plan?: string;
-    }) => {
-        // Save current content to undo history for each section
-        Object.keys(sections).forEach((section) => {
-            const key = section as keyof typeof sections;
-            if (sections[key]) {
+    const handleVoiceRecordingComplete = (sections: Partial<NoteContent>) => {
+        console.log('Voice recording sections to update:', sections)
+        const validSections: NoteSection[] = ['subjective', 'objective', 'assessment', 'plan']
+        validSections.forEach(section => {
+            if (sections[section]) {
                 setUndoHistory(prev => ({
                     ...prev,
-                    [key]: [...(prev[key] || []), noteContent[key]]
-                }));
+                    [section]: [...prev[section], noteContent[section]]
+                }))
             }
-        });
+        })
 
-        // Update each section's content
-        setNoteContent(prevContent => ({
-            ...prevContent,
-            ...Object.keys(sections).reduce((acc, section) => {
-                const key = section as keyof typeof sections;
-                if (sections[key]) {
-                    acc[key] = sections[key]!;
+        setNoteContent(prevContent => {
+            const newContent = { ...prevContent }
+            validSections.forEach(section => {
+                if (sections[section]) {
+                    newContent[section] = sections[section]!
                 }
-                return acc;
-            }, {} as typeof prevContent)
-        }));
+            })
+            console.log('Updated note content after voice recording:', newContent)
+            return newContent
+        })
 
-        // Reset recording state
-        setIsRecording(false);
-    };
+        setIsRecording(false)
+    }
 
     const handleTemplateSelect = (template: NoteTemplate | null) => {
         setSelectedTemplate(template)
@@ -245,34 +343,49 @@ export function NotesTab({
         }
     }
 
-    const handleAIAssist = (suggestion: string, action: 'append' | 'replace', section: keyof SessionNote['content']) => {
-        // Get the current editor content
+    const handleAIAssist = (suggestion: string, action: 'append' | 'replace', section: NoteSection) => {
+        console.log('AI assist:', { suggestion, action, section })
         const currentContent = noteContent[section]
 
-        // Save current content to undo history before modifying
         setUndoHistory(prev => ({
             ...prev,
-            [section]: [...(prev[section] || []), currentContent]
+            [section]: [...prev[section], currentContent]
         }))
 
-        // Update the editor content
         const newContent = action === 'append'
             ? `${currentContent || ''}${suggestion}`
             : suggestion
 
-        // Update the state
+        console.log('Updated content after AI assist:', { section, newContent })
         setNoteContent(prev => ({
             ...prev,
             [section]: newContent
         }))
     }
 
-    const handleNoteSelection = (note: SessionNote) => {
+    const handleNoteSelection = (note: ClinicalNote) => {
         setSelectedNote(note)
         setNoteContent(note.content)
-        setSelectedAppointment(appointments.find(a => a.id === note.appointment_id) || null)
+        setSelectedAppointment(findAppointment(note.appointment_id))
         setIsCreatingNewNote(false)
     }
+
+    const handleAppointmentSelect = (value: string) => {
+        const appointment = findAppointment(value)
+        setSelectedAppointment(appointment)
+        if (appointment) {
+            setIsCreatingNewNote(false)
+        }
+    }
+
+    const handleCreateNewNote = () => {
+        console.log('Creating new note, current appointments:', appointments)
+        setIsCreatingNewNote(true)
+        // Ensure appointments are fetched
+        fetchAppointments(patientId)
+    }
+
+    const sections: Array<keyof NoteContent> = ['subjective', 'objective', 'assessment', 'plan']
 
     return (
         <div className="flex h-[calc(100vh-200px)]">
@@ -287,7 +400,7 @@ export function NotesTab({
 
                 {!selectedAppointment && !isCreatingNewNote ? (
                     <>
-                        <Button onClick={() => setIsCreatingNewNote(true)} className="mb-4">
+                        <Button onClick={handleCreateNewNote} className="mb-4">
                             Create New Note
                         </Button>
                         {selectedNote ? (
@@ -296,7 +409,7 @@ export function NotesTab({
                                 onClose={() => setSelectedNote(null)}
                                 onEdit={() => {
                                     setIsCreatingNewNote(false)
-                                    setSelectedAppointment(appointments.find(a => a.id === selectedNote.appointment_id) || null)
+                                    setSelectedAppointment(appointments?.find(a => a.id === selectedNote.appointment_id) || null)
                                 }}
                             />
                         ) : (
@@ -313,20 +426,14 @@ export function NotesTab({
                             Back to History
                         </Button>
                         <Select
-                            value={selectedAppointment?.id ?? ''}
-                            onValueChange={(value: string) => {
-                                const appointment = appointments.find((a: Appointment) => a.id === value)
-                                if (appointment) {
-                                    setSelectedAppointment(appointment)
-                                    setIsCreatingNewNote(false)
-                                }
-                            }}
+                            value={selectedAppointment?.id || ''}
+                            onValueChange={handleAppointmentSelect}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select appointment to create a new note..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {(appointments as Appointment[]).map((appointment: Appointment) => (
+                                {appointments.map((appointment) => (
                                     <SelectItem key={appointment.id} value={appointment.id}>
                                         {format(new Date(appointment.appointment_date), 'MMM d, yyyy')} {appointment.appointment_time} - {appointment.reason_for_visit}
                                     </SelectItem>
@@ -339,7 +446,7 @@ export function NotesTab({
                         {/* Existing appointment selector */}
                         <Select
                             value={selectedAppointment?.id || ''}
-                            onValueChange={(value) => setSelectedAppointment(appointments.find(a => a.id === value) || null)}
+                            onValueChange={handleAppointmentSelect}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select appointment..." />
@@ -404,41 +511,49 @@ export function NotesTab({
 
                                     {/* Voice Recorder */}
                                     {isRecording && (
-                                        <div className="border rounded-lg p-4 bg-muted/50 mb-4">
-                                            <VoiceRecorder
-                                                isRecording={isRecording}
-                                                onToggleRecording={() => setIsRecording(!isRecording)}
-                                                onTranscriptionComplete={handleVoiceRecordingComplete}
-                                            />
+                                        <div className="border rounded-lg p-4 bg-gradient-to-br from-primary/5 via-background to-primary/5 mb-4 relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-grid-primary/5 mask-gradient animate-grid-flow" />
+                                            <div className="relative z-10">
+                                                <VoiceRecorder
+                                                    isRecording={isRecording}
+                                                    onToggleRecording={() => setIsRecording(!isRecording)}
+                                                    onTranscriptionComplete={handleVoiceRecordingComplete}
+                                                />
+                                            </div>
                                         </div>
                                     )}
 
                                     {/* SOAP Note Structure with Integrated AI */}
                                     <div className="space-y-6">
-                                        {(Object.keys(noteContent) as Array<keyof SessionNote['content']>).map((section) => (
+                                        {sections.map((section) => (
                                             <div key={section} className="space-y-2">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-lg font-semibold capitalize flex items-center gap-2">
                                                         {section}
-                                                        <AIAssistant
-                                                            noteContent={noteContent}
-                                                            onSuggestion={(suggestion, action) => handleAIAssist(suggestion, action, section)}
-                                                            patientData={{
-                                                                appointmentType: selectedAppointment.visit_type,
-                                                                reasonForVisit: selectedAppointment.reason_for_visit,
-                                                                patientId: patientId
-                                                            }}
-                                                            currentSection={section}
-                                                        />
+                                                        <div className="relative">
+                                                            <AIAssistant
+                                                                noteContent={noteContent}
+                                                                onSuggestion={(suggestion, action) => handleAIAssist(suggestion, action, section)}
+                                                                patientData={{
+                                                                    appointmentType: selectedAppointment?.visit_type ?? '',
+                                                                    reasonForVisit: selectedAppointment?.reason_for_visit ?? '',
+                                                                    patientId: patientId
+                                                                }}
+                                                                currentSection={section}
+                                                            />
+                                                            <div className="absolute -inset-1 bg-primary/10 rounded-full blur-lg group-hover:bg-primary/20 transition-colors" />
+                                                        </div>
                                                     </h3>
                                                 </div>
                                                 <div className={cn(
-                                                    "rounded-lg border bg-card",
+                                                    "rounded-lg border bg-card relative group transition-all duration-300",
+                                                    "hover:shadow-md hover:border-primary/20",
                                                     section === 'assessment' && "border-l-4 border-l-blue-500",
                                                     section === 'plan' && "border-l-4 border-l-green-500",
                                                     section === 'subjective' && "border-l-4 border-l-purple-500",
                                                     section === 'objective' && "border-l-4 border-l-orange-500"
                                                 )}>
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     <TipTapEditor
                                                         content={noteContent[section]}
                                                         onChange={(value) => {
@@ -460,37 +575,32 @@ export function NotesTab({
                     </>
                 )}
             </div>
-
-            {/* Right Sidebar - Previous Sessions and Templates */}
-            {showSidebar && (
-                <Card className="w-80 p-4 ml-4 overflow-y-auto">
-                    <Tabs defaultValue="previous-sessions">
-                        <TabsList className="w-full">
-                            <TabsTrigger value="previous-sessions" className="flex-1">Previous Sessions</TabsTrigger>
-                            <TabsTrigger value="templates" className="flex-1">Templates</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="previous-sessions">
-                            <NotesHistory
-                                notes={notes}
-                                onSelectNote={(note) => {
-                                    onEditNote(note)
-                                    setNoteContent(note.content)
-                                    setSelectedAppointment(appointments.find(a => a.id === note.appointment_id) || null)
-                                    setIsCreatingNewNote(false)
-                                }}
-                                activeNoteId={activeNote?.id}
-                            />
-                        </TabsContent>
-                        <TabsContent value="templates">
-                            <NoteTemplateSelector
-                                templates={templates}
-                                selectedTemplate={selectedTemplate}
-                                onSelectTemplate={handleTemplateSelect}
-                            />
-                        </TabsContent>
-                    </Tabs>
-                </Card>
-            )}
         </div>
     )
 }
+
+<style jsx global>{`
+    @keyframes grid-flow {
+        0% {
+            transform: translateY(0) translateX(0);
+        }
+        100% {
+            transform: translateY(-50%) translateX(-50%);
+        }
+    }
+
+    .animate-grid-flow {
+        animation: grid-flow 20s linear infinite;
+    }
+
+    .bg-grid-primary {
+        background-image: linear-gradient(to right, var(--primary) 1px, transparent 1px),
+                         linear-gradient(to bottom, var(--primary) 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+
+    .mask-gradient {
+        mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+    }
+`}</style>
+

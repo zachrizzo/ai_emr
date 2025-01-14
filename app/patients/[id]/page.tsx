@@ -53,37 +53,14 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
     loadPatient()
   }, [params.id])
 
-  const handleCreateNote = async (noteData: CreateClinicalNoteParams) => {
-    try {
-      if (!user?.id || !user.organization_id) {
-        throw new Error('User not authenticated or missing organization')
-      }
-
-      await createClinicalNote({
-        ...noteData,
-        provider_id: user.id,
-        patient_id: params.id,
-        organization_id: user.organization_id,
-      })
-
-      toast({
-        title: 'Note Created',
-        description: 'The clinical note has been saved successfully.',
-      })
-    } catch (error) {
-      console.error('Error creating note:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to create the clinical note. Please try again.',
-        variant: 'destructive',
-      })
-    }
-  }
-
   const handleUpdateNote = async (noteId: string, noteData: UpdateClinicalNoteParams) => {
     try {
-      if (!user) return;
-      await updateClinicalNote(noteId, user.organization_id, noteData)
+      if (!user?.organization_id) {
+        throw new Error('User not authenticated or missing organization')
+      }
+      console.log('Updating note:', { noteId, noteData })
+      const updatedNote = await updateClinicalNote(noteId, noteData)
+      console.log('Updated note:', updatedNote)
       setActiveNote(null)
       toast({
         title: 'Note Updated',
@@ -93,9 +70,10 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
       console.error('Error updating note:', error)
       toast({
         title: 'Error',
-        description: 'Failed to update the clinical note. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to update the clinical note. Please try again.',
         variant: 'destructive',
       })
+      throw error
     }
   }
 
@@ -167,9 +145,7 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
           <NotesTab
             patientId={patient.id}
             providerId={user.id}
-            organizationId={user.organization_id}
             activeNote={activeNote}
-            onCreateNote={handleCreateNote}
             onUpdateNote={handleUpdateNote}
             onEditNote={handleEditNote}
           />

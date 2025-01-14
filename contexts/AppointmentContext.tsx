@@ -6,7 +6,7 @@ import { useUser } from '@/contexts/UserContext'
 import { supabase } from '@/utils/supabase-config'
 import { toast } from '@/components/ui/use-toast'
 
-interface AppointmentContextType {
+export interface AppointmentContextType {
     appointments: Appointment[]
     isLoading: boolean
     error: Error | null

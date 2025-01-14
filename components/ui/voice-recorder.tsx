@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/use-toast'
 import { Mic, Square, Pause, Play, Loader2 } from 'lucide-react'
 import { Card } from './card'
+import { cn } from '@/lib/utils'
 
 interface VoiceRecorderProps {
     onTranscriptionComplete: (sections: {
@@ -27,6 +28,7 @@ export function VoiceRecorder({
     const [audioChunks, setAudioChunks] = useState<Blob[]>([])
     const [duration, setDuration] = useState(0)
     const [isProcessing, setIsProcessing] = useState(false)
+    const [processingStage, setProcessingStage] = useState<'recording' | 'transcribing' | 'analyzing' | 'summarizing' | null>(null)
     const [audioLevel, setAudioLevel] = useState(0)
     const [isPaused, setIsPaused] = useState(false)
     const [transcriptionResult, setTranscriptionResult] = useState<{
@@ -39,6 +41,7 @@ export function VoiceRecorder({
         }
     } | null>(null)
     const [showResults, setShowResults] = useState(false)
+    const [showStopTransition, setShowStopTransition] = useState(false)
 
     const streamRef = useRef<MediaStream | null>(null)
     const animationFrameRef = useRef<number>()
@@ -107,10 +110,14 @@ export function VoiceRecorder({
     const handleStopRecording = () => {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             try {
+                setShowStopTransition(true)
+                setIsProcessing(true)
                 mediaRecorder.stop()
             } catch (error) {
                 console.error('Error stopping recording:', error)
                 cleanup()
+                setShowStopTransition(false)
+                setIsProcessing(false)
                 if (typeof onToggleRecording === 'function') {
                     onToggleRecording()
                 }
@@ -131,6 +138,7 @@ export function VoiceRecorder({
 
     const handleRecordingComplete = async (audioBlob: Blob) => {
         try {
+            setProcessingStage('transcribing')
             const reader = new FileReader()
             reader.readAsDataURL(audioBlob)
             reader.onloadend = async () => {
@@ -138,6 +146,7 @@ export function VoiceRecorder({
                     const base64Audio = reader.result as string
                     const base64Data = base64Audio.split(',')[1]
 
+                    setProcessingStage('analyzing')
                     const response = await fetch('https://lrcjwwqslypchbxlkduw.supabase.co/functions/v1/transcribe-audio', {
                         method: 'POST',
                         headers: {
@@ -151,10 +160,12 @@ export function VoiceRecorder({
                         throw new Error(`Failed to process audio: ${errorData}`)
                     }
 
+                    setProcessingStage('summarizing')
                     const result = await response.json()
-                    console.log('Transcription result:', result) // Debug log
+                    console.log('Transcription result:', result)
                     setTranscriptionResult(result)
                     setShowResults(true)
+                    setProcessingStage(null)
                 } catch (error) {
                     console.error('Error in reader.onloadend:', error)
                     toast({
@@ -163,6 +174,7 @@ export function VoiceRecorder({
                         variant: 'destructive',
                     })
                 } finally {
+                    setProcessingStage(null)
                 }
             }
         } catch (error) {
@@ -173,6 +185,7 @@ export function VoiceRecorder({
                 variant: 'destructive',
             })
             onToggleRecording()
+            setProcessingStage(null)
         }
     }
 
@@ -204,7 +217,6 @@ export function VoiceRecorder({
             }
 
             recorder.onstop = async () => {
-                setIsProcessing(true)
                 try {
                     // Wait a bit to ensure all chunks are collected
                     await new Promise(resolve => setTimeout(resolve, 100))
@@ -226,7 +238,7 @@ export function VoiceRecorder({
                         description: error instanceof Error ? error.message : 'Failed to process audio recording',
                         variant: 'destructive',
                     })
-                } finally {
+                    setShowStopTransition(false)
                     setIsProcessing(false)
                     cleanup()
                 }
@@ -460,11 +472,14 @@ export function VoiceRecorder({
                                     variant="destructive"
                                     size="icon"
                                     onClick={handleStopRecording}
-                                    disabled={isProcessing}
-                                    className="h-10 w-10"
+                                    disabled={isProcessing || showStopTransition}
+                                    className="h-10 w-10 relative"
                                 >
-                                    {isProcessing ? (
-                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    {isProcessing || showStopTransition ? (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="h-8 w-8 rounded-full border-2 border-primary animate-ping absolute" />
+                                            <Loader2 className="h-5 w-5 animate-spin relative z-10" />
+                                        </div>
                                     ) : (
                                         <Square className="h-5 w-5" />
                                     )}
@@ -473,7 +488,7 @@ export function VoiceRecorder({
                                     variant="outline"
                                     size="icon"
                                     onClick={handlePauseResume}
-                                    disabled={isProcessing}
+                                    disabled={isProcessing || showStopTransition}
                                     className="h-10 w-10"
                                 >
                                     {isPaused ? (
@@ -488,10 +503,11 @@ export function VoiceRecorder({
                                 variant="default"
                                 size="icon"
                                 onClick={onToggleRecording}
-                                disabled={isProcessing}
-                                className="h-10 w-10"
+                                disabled={isProcessing || showStopTransition}
+                                className="h-10 w-10 relative group"
                             >
-                                <Mic className="h-5 w-5" />
+                                <div className="absolute inset-0 bg-primary/10 rounded-full scale-150 group-hover:scale-175 transition-transform duration-300" />
+                                <Mic className="h-5 w-5 relative z-10" />
                             </Button>
                         )}
                     </div>
@@ -501,45 +517,139 @@ export function VoiceRecorder({
                                 {formatTime(duration)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {isPaused ? "Paused" : "Recording"}
+                                {isPaused ? "Paused" : showStopTransition ? "Finalizing recording..." : "Recording"}
                             </span>
                         </div>
                     )}
                 </div>
-                {isRecording && (
+                {showStopTransition && !processingStage && (
+                    <div className="relative mt-4">
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 animate-pulse rounded-lg" />
+                        <div className="relative p-6">
+                            <div className="flex flex-col items-center justify-center space-y-4">
+                                <div className="flex items-center justify-center gap-1 h-8">
+                                    {[...Array(5)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="w-1 bg-primary/60 rounded-full animate-waveform"
+                                            style={{
+                                                height: '100%',
+                                                animationDelay: `${i * 0.1}s`
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+                                        <Loader2 className="h-5 w-5 animate-spin relative z-10" />
+                                    </div>
+                                    <span className="text-sm font-medium bg-gradient-to-r from-primary/80 to-primary bg-clip-text text-transparent animate-gradient">
+                                        Processing your recording...
+                                    </span>
+                                </div>
+                                <div className="relative h-24 w-24">
+                                    <svg className="absolute inset-0 animate-spin-slow" viewBox="0 0 100 100">
+                                        <circle
+                                            cx="50"
+                                            cy="50"
+                                            r="45"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            className="text-primary/20"
+                                        />
+                                        <circle
+                                            cx="50"
+                                            cy="50"
+                                            r="45"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeDasharray="283"
+                                            strokeDashoffset="100"
+                                            className="text-primary animate-progress"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {isRecording && !showStopTransition && (
                     <div className="space-y-3">
-                        <div className="space-y-1">
-                            <Progress
-                                value={audioLevel / 2.56}
-                                className="h-2"
-                                // Add a pulsing animation when recording
-                                style={{
-                                    animation: isPaused ? 'none' : 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-                                }}
-                            />
+                        <div className="relative h-12 flex items-center justify-center">
+                            <div className="flex items-center justify-center gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="w-1 bg-primary rounded-full transition-all duration-200 ease-in-out"
+                                        style={{
+                                            height: `${Math.max(15, Math.min(40, audioLevel / 6.4))}px`,
+                                            opacity: isPaused ? 0.3 : 0.8,
+                                            transform: `scaleY(${isPaused ? 0.5 : 1})`,
+                                            animationDelay: `${i * 0.1}s`
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            {!isPaused && (
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                                    <div className="w-2 h-2 bg-primary/30 rounded-full animate-ping" />
+                                </div>
+                            )}
                         </div>
                         <p className="text-xs text-center text-muted-foreground">
                             {isPaused
-                                ? "Recording is paused. Click play to resume."
-                                : "Speak clearly into your microphone..."
+                                ? "Recording paused"
+                                : "Recording in progress..."
                             }
                         </p>
                     </div>
                 )}
-                {isProcessing && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Processing your recording...</span>
+                {(isProcessing || showStopTransition) && !showResults && (
+                    <div className="relative mt-4">
+                        <div className="relative py-8">
+                            <div className="flex flex-col items-center justify-center space-y-4">
+                                {/* Simplified Processing Animation */}
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-25" />
+                                    <div className="relative z-10 h-16 w-16 rounded-full border-2 border-primary/30 flex items-center justify-center">
+                                        <div className="h-12 w-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                    </div>
+                                </div>
+
+                                {/* Status Text */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <span className="text-sm font-medium text-primary/80">
+                                        {processingStage ? (
+                                            <>
+                                                {processingStage === 'transcribing' && 'Transcribing...'}
+                                                {processingStage === 'analyzing' && 'Analyzing...'}
+                                                {processingStage === 'summarizing' && 'Summarizing...'}
+                                            </>
+                                        ) : (
+                                            'Processing...'
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <div className="h-1 w-1 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                        <div className="h-1 w-1 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                        <div className="h-1 w-1 bg-primary/60 rounded-full animate-bounce" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
             <style jsx global>{`
-                @keyframes pulse {
+                @keyframes wave {
                     0%, 100% {
-                        opacity: 1;
+                        transform: scaleY(0.3);
                     }
                     50% {
-                        opacity: .5;
+                        transform: scaleY(1);
                     }
                 }
             `}</style>

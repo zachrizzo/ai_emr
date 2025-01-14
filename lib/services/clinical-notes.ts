@@ -1,7 +1,7 @@
 import { supabase } from '@/utils/supabase-config'
-import { SessionNote } from '@/types/notes'
+import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams } from '@/types/notes'
 
-export async function getClinicalNotes(patientId: string, organizationId: string): Promise<SessionNote[]> {
+export async function getClinicalNotes(patientId: string, organizationId: string): Promise<ClinicalNote[]> {
     const { data, error } = await supabase
         .from('clinical_notes')
         .select(`
@@ -20,6 +20,7 @@ export async function getClinicalNotes(patientId: string, organizationId: string
             tags,
             is_deleted,
             created_at,
+            updated_at,
             signed_at,
             signed_by
         `)
@@ -33,28 +34,41 @@ export async function getClinicalNotes(patientId: string, organizationId: string
         throw error
     }
 
-    return data || []
+    console.log('Raw notes data:', data)
+    return data?.map(note => ({
+        ...note,
+        tags: note.tags || [],
+        is_deleted: note.is_deleted || false
+    })) || []
 }
 
-export async function createClinicalNote(note: any) {
-  const { data, error } = await supabase
-    .from('clinical_notes')
-    .insert([note])
-    .select()
+export async function createClinicalNote(note: CreateClinicalNoteParams): Promise<ClinicalNote> {
+    const { data, error } = await supabase
+        .from('clinical_notes')
+        .insert([note])
+        .select()
 
-  if (error) throw error
-  return data[0]
+    if (error) throw error
+    return {
+        ...data[0],
+        tags: data[0].tags || [],
+        is_deleted: data[0].is_deleted || false
+    }
 }
 
-export async function updateClinicalNote(id: string, note: any) {
-  const { data, error } = await supabase
-    .from('clinical_notes')
-    .update(note)
-    .eq('id', id)
-    .select()
+export async function updateClinicalNote(id: string, note: UpdateClinicalNoteParams): Promise<ClinicalNote> {
+    const { data, error } = await supabase
+        .from('clinical_notes')
+        .update(note)
+        .eq('id', id)
+        .select()
 
-  if (error) throw error
-  return data[0]
+    if (error) throw error
+    return {
+        ...data[0],
+        tags: data[0].tags || [],
+        is_deleted: data[0].is_deleted || false
+    }
 }
 
 export async function deleteClinicalNote(noteId: string): Promise<void> {
@@ -84,9 +98,12 @@ export function subscribeToClinicalNotes(
                 event: 'INSERT',
                 schema: 'public',
                 table: 'clinical_notes',
-                filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
+                filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId} AND is_deleted=eq.false`
             },
-            () => onInsert()
+            (payload) => {
+                console.log('Note inserted:', payload)
+                onInsert()
+            }
         )
         .on(
             'postgres_changes',
@@ -94,9 +111,15 @@ export function subscribeToClinicalNotes(
                 event: 'UPDATE',
                 schema: 'public',
                 table: 'clinical_notes',
-                filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
+                filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId} AND is_deleted=eq.false`
             },
-            () => onUpdate()
+            (payload) => {
+                // Only trigger reload if content was changed
+                if (payload.new && 'content' in payload.new) {
+                    console.log('Note content updated:', payload)
+                    onUpdate()
+                }
+            }
         )
         .on(
             'postgres_changes',
@@ -106,7 +129,10 @@ export function subscribeToClinicalNotes(
                 table: 'clinical_notes',
                 filter: `patient_id=eq.${patientId} AND organization_id=eq.${organizationId}`
             },
-            () => onDelete()
+            (payload) => {
+                console.log('Note deleted:', payload)
+                onDelete()
+            }
         )
         .subscribe()
 
