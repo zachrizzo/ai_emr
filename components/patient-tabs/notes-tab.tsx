@@ -16,7 +16,7 @@ import { TipTapEditor } from "@/components/ui/tiptap-editor"
 import { NotesHistory } from "@/components/ui/notes-history"
 import { VoiceRecorder } from "@/components/ui/voice-recorder"
 import { NoteTemplateSelector } from "@/components/ui/note-template-selector"
-import { AIAssistant } from "@/components/ui/ai-assistant"
+import { AIAssistant } from "@/components/messaging/ai-assistant"
 import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate, SessionNote } from '@/types'
 import { format } from 'date-fns'
 import { Mic, MicOff, Save, FileText, Sparkles, X, ChevronLeft, ChevronRight, Search, ArrowLeft } from 'lucide-react'
@@ -42,6 +42,7 @@ import { useAppointments } from '@/contexts/AppointmentContext'
 import { useUser } from '@/contexts/UserContext'
 import { cn } from "@/lib/utils"
 import { Appointment } from '@/types/notes'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 type NoteSection = 'subjective' | 'objective' | 'assessment' | 'plan'
 
@@ -385,7 +386,7 @@ export function NotesTab({
         fetchAppointments(patientId)
     }
 
-    const sections: Array<keyof NoteContent> = ['subjective', 'objective', 'assessment', 'plan']
+    const sections: Array<NoteSection> = ['subjective', 'objective', 'assessment', 'plan']
 
     return (
         <div className="flex h-[calc(100vh-200px)]">
@@ -465,47 +466,88 @@ export function NotesTab({
                             <Card className="p-4">
                                 <div className="flex flex-col gap-4">
                                     {/* Header Controls */}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="font-semibold text-lg">
-                                                {activeNote ? 'Edit Session Note' : 'New Session Note'}
-                                            </h3>
-                                            {selectedTemplate && (
-                                                <Badge variant="secondary" className="gap-1">
-                                                    Template: {selectedTemplate.name}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-4 w-4 p-0 hover:bg-transparent"
-                                                        onClick={() => handleTemplateSelect(null)}
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </Button>
+                                    <div className="flex flex-col gap-4 pb-4 border-b">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <h3 className="font-semibold text-lg">
+                                                    {activeNote ? 'Edit Session Note' : 'New Session Note'}
+                                                </h3>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {format(new Date(selectedAppointment?.appointment_date || ''), 'MMM d, yyyy')}
                                                 </Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            {/* Voice Recording Toggle */}
-                                            <Button
-                                                variant={isRecording ? "destructive" : "secondary"}
-                                                size="icon"
-                                                onClick={() => setIsRecording(!isRecording)}
-                                            >
-                                                {isRecording ? (
-                                                    <MicOff className="h-4 w-4" />
-                                                ) : (
-                                                    <Mic className="h-4 w-4" />
+                                                {selectedTemplate && (
+                                                    <Badge variant="secondary" className="gap-1">
+                                                        Template: {selectedTemplate.name}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-4 w-4 p-0 hover:bg-transparent"
+                                                            onClick={() => handleTemplateSelect(null)}
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </Button>
+                                                    </Badge>
                                                 )}
-                                            </Button>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {/* AI Assistant Button with Popover */}
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="gap-2 group"
+                                                        >
+                                                            <Sparkles className="h-4 w-4 text-primary group-hover:animate-pulse" />
+                                                            <span className="text-sm">AI Assistant</span>
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent
+                                                        side="bottom"
+                                                        align="start"
+                                                        sideOffset={600}
+                                                        alignOffset={-300}
+                                                        avoidCollisions={true}
+                                                        className="p-0 border-none bg-transparent shadow-none"
+                                                    >
+                                                        <AIAssistant
+                                                            patientId={patientId}
+                                                            onUpdateNote={(content) => {
+                                                                if (content) {
+                                                                    setNoteContent(content)
+                                                                }
+                                                            }}
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
 
-                                            {/* Save/Update Button */}
-                                            <Button
-                                                onClick={activeNote ? handleUpdateNote : handleCreateNote}
-                                                className="gap-2"
-                                            >
-                                                <Save className="h-4 w-4" />
-                                                {activeNote ? 'Update' : 'Save'}
-                                            </Button>
+                                                {/* Voice Recording Toggle */}
+                                                <Button
+                                                    variant={isRecording ? "destructive" : "secondary"}
+                                                    size="icon"
+                                                    onClick={() => setIsRecording(!isRecording)}
+                                                >
+                                                    {isRecording ? (
+                                                        <MicOff className="h-4 w-4" />
+                                                    ) : (
+                                                        <Mic className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+
+                                                {/* Save/Update Button */}
+                                                <Button
+                                                    onClick={activeNote ? handleUpdateNote : handleCreateNote}
+                                                    className="gap-2"
+                                                >
+                                                    <Save className="h-4 w-4" />
+                                                    {activeNote ? 'Update' : 'Save'}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {selectedAppointment?.reason_for_visit && (
+                                                <span>Reason for visit: {selectedAppointment.reason_for_visit}</span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -523,26 +565,13 @@ export function NotesTab({
                                         </div>
                                     )}
 
-                                    {/* SOAP Note Structure with Integrated AI */}
+                                    {/* SOAP Note Structure */}
                                     <div className="space-y-6">
-                                        {sections.map((section) => (
+                                        {sections.map((section: NoteSection) => (
                                             <div key={section} className="space-y-2">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-lg font-semibold capitalize flex items-center gap-2">
                                                         {section}
-                                                        <div className="relative">
-                                                            <AIAssistant
-                                                                noteContent={noteContent}
-                                                                onSuggestion={(suggestion, action) => handleAIAssist(suggestion, action, section)}
-                                                                patientData={{
-                                                                    appointmentType: selectedAppointment?.visit_type ?? '',
-                                                                    reasonForVisit: selectedAppointment?.reason_for_visit ?? '',
-                                                                    patientId: patientId
-                                                                }}
-                                                                currentSection={section}
-                                                            />
-                                                            <div className="absolute -inset-1 bg-primary/10 rounded-full blur-lg group-hover:bg-primary/20 transition-colors" />
-                                                        </div>
                                                     </h3>
                                                 </div>
                                                 <div className={cn(

@@ -20,8 +20,17 @@ serve(async (req) => {
       throw new Error('Missing Authorization header')
     }
 
+    // Create Supabase client to verify the token
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    )
+
+    // Verify the JWT
     const token = authHeader.replace('Bearer ', '')
-    if (token !== Deno.env.get('SUPABASE_ANON_KEY')) {
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+
+    if (authError || !user) {
       throw new Error('Invalid Authorization token')
     }
 
@@ -30,11 +39,6 @@ serve(async (req) => {
     if (!organizationId) {
       throw new Error('Organization ID is required')
     }
-
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    )
 
     const openai = new OpenAI({
       apiKey: Deno.env.get("OPENAI_API_KEY"),
