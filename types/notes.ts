@@ -6,6 +6,7 @@ export type AccessAction = 'view' | 'edit' | 'sign' | 'print' | 'share';
 export interface NoteTemplate {
   id: string;
   name: string;
+  description?: string;
   content: {
     subjective: string;
     objective: string;
@@ -13,6 +14,9 @@ export interface NoteTemplate {
     plan: string;
   };
   organization_id: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
 }
 
 export interface NoteContent {
@@ -28,14 +32,18 @@ export interface ClinicalNote {
   provider_id: string;
   organization_id: string;
   appointment_id: string;
-  content: NoteContent;
-  type: 'manual' | 'ai' | 'voice';
-  status: NoteStatus;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>;
+  content: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
+  type: 'manual' | 'ai' | 'voice';
+  status: 'draft' | 'completed';
+  metadata?: any;
   tags?: string[];
-  version?: number;
 }
 
 export interface NoteSection {
@@ -110,19 +118,30 @@ export interface CreateClinicalNoteParams {
   provider_id: string;
   organization_id: string;
   appointment_id: string;
-  content: NoteContent;
+  content: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
   type: 'manual' | 'ai' | 'voice';
-  status: NoteStatus;
-  metadata?: Record<string, any>;
+  status: 'draft' | 'completed';
+  metadata?: any;
   tags?: string[];
+  template_id?: string;
 }
 
 export interface UpdateClinicalNoteParams {
-  content?: NoteContent;
-  status?: NoteStatus;
-  metadata?: Record<string, any>;
-  tags?: string[];
+  content: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
+  status: 'draft' | 'completed';
   updated_at: string;
+  metadata?: any;
+  tags?: string[];
 }
 
 export interface SessionNote extends ClinicalNote {

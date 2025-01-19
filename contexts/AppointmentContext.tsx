@@ -16,7 +16,15 @@ export interface AppointmentContextType {
     deleteAppointment: (id: string) => Promise<void>
 }
 
-const AppointmentContext = createContext<AppointmentContextType | undefined>(undefined)
+const AppointmentContext = createContext<AppointmentContextType>({
+    appointments: [],
+    isLoading: false,
+    error: null,
+    fetchAppointments: async () => { },
+    addAppointment: async () => { },
+    updateAppointment: async () => { },
+    deleteAppointment: async () => { }
+})
 
 export function AppointmentProvider({ children }: { children: React.ReactNode }) {
     const [appointments, setAppointments] = useState<Appointment[]>([])

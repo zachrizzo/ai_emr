@@ -81,30 +81,6 @@ export interface ClinicalNoteVitals extends Vitals {
     recorded_by: string
 }
 
-export interface ClinicalNote {
-  id: string
-  patient_id: string
-  provider_id: string
-  note_type: string
-  chief_complaint: string
-  subjective: string
-  objective: string
-  assessment: string
-  plan: string
-  vitals?: ClinicalNoteVitals
-  created_at: string
-  updated_at: string
-  status: 'draft' | 'completed'
-  follow_up_date?: string
-  diagnosis_codes?: string[]
-  treatment_plan?: string
-  medications?: string[]
-  allergies?: string[]
-  lab_orders?: string[]
-  imaging_orders?: string[]
-  referrals?: string[]
-}
-
 export interface Medication {
     id: string
     patient_id: string

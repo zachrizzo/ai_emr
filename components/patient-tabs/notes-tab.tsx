@@ -17,7 +17,16 @@ import { NotesHistory } from "@/components/ui/notes-history"
 import { VoiceRecorder } from "@/components/ui/voice-recorder"
 import { NoteTemplateSelector } from "@/components/ui/note-template-selector"
 import { AIAssistant } from "@/components/messaging/ai-assistant"
-import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate, SessionNote, Vitals, VitalRanges } from '@/types'
+import {
+    ClinicalNote,
+    CreateClinicalNoteParams,
+    UpdateClinicalNoteParams,
+    NoteTemplate,
+    SessionNote,
+    NoteContent,
+    Appointment as AppointmentType
+} from '@/types/notes'
+import { Vitals, VitalRanges } from '@/types'
 import { format } from 'date-fns'
 import { Mic, MicOff, Save, FileText, Sparkles, X, ChevronLeft, ChevronRight, Search, ArrowLeft } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"
@@ -41,19 +50,14 @@ import { getClinicalNotes, deleteClinicalNote, subscribeToClinicalNotes, createC
 import { useAppointments } from '@/contexts/AppointmentContext'
 import { useUser } from '@/contexts/UserContext'
 import { cn } from "@/lib/utils"
-import { Appointment } from '@/types/notes'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from '@/components/ui/textarea'
 import { debounce } from 'lodash'
+import { PreviousSessionNotes } from "@/components/ui/previous-session-notes"
+import { AppointmentDetails } from "@/components/ui/appointment-details"
+import { AppointmentContextType } from '@/contexts/AppointmentContext'
 
 type NoteSection = 'subjective' | 'objective' | 'assessment' | 'plan'
-
-type NoteContent = {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-}
 
 type UndoHistory = {
     subjective: string[];
@@ -101,21 +105,20 @@ export function NotesTab({
     const [notes, setNotes] = useState<ClinicalNote[]>([])
     const [templates, setTemplates] = useState<NoteTemplate[]>([])
     const appointmentContext = useAppointments()
-    const appointments = Array.isArray(appointmentContext?.appointments)
-        ? appointmentContext.appointments as Appointment[]
-        : []
-    const isLoadingAppointments = appointmentContext?.isLoading ?? false
-    const fetchAppointments = appointmentContext?.fetchAppointments ?? (async () => { })
+    const appointments = appointmentContext.appointments
+    const isLoadingAppointments = appointmentContext.isLoading
+    const fetchAppointments = appointmentContext.fetchAppointments
     const [vitals, setVitals] = useState<Vitals | null>(null)
-    const [newNote, setNewNote] = useState<Partial<ClinicalNote>>({
+    const [newNote, setNewNote] = useState<Partial<CreateClinicalNoteParams>>({
         patient_id: patientId,
         provider_id: providerId,
-        note_type: 'progress',
-        chief_complaint: '',
-        subjective: '',
-        objective: '',
-        assessment: '',
-        plan: '',
+        content: {
+            subjective: '',
+            objective: '',
+            assessment: '',
+            plan: ''
+        },
+        type: 'manual',
         status: 'draft'
     })
     const [newVitals, setNewVitals] = useState<Partial<Vitals>>({
@@ -134,7 +137,7 @@ export function NotesTab({
         blood_glucose: undefined
     })
 
-    const findAppointment = (appointmentId?: string): Appointment | null => {
+    const findAppointment = (appointmentId?: string): AppointmentType | null => {
         if (!appointmentId || !appointments?.length) return null
         return appointments.find(apt => apt.id === appointmentId) ?? null
     }
@@ -143,7 +146,7 @@ export function NotesTab({
     const organizationId = userData?.organization_id
 
     const [selectedTemplate, setSelectedTemplate] = useState<NoteTemplate | null>(null)
-    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+    const [selectedAppointment, setSelectedAppointment] = useState<AppointmentType | null>(null)
     const [noteContent, setNoteContent] = useState<NoteContent>({
         subjective: '',
         objective: '',
@@ -165,6 +168,7 @@ export function NotesTab({
     const [isSaving, setIsSaving] = useState(false)
     const lastSavedContent = useRef<NoteContent | null>(null)
     const lastSavedVitals = useRef<Partial<Vitals> | null>(null)
+    const [showPreviousNotes, setShowPreviousNotes] = useState(true)
 
     useEffect(() => {
         console.log('Appointments context:', appointments)
@@ -315,7 +319,7 @@ export function NotesTab({
 
     const debouncedSaveNote = useCallback(
         debounce(async (noteData: NoteContent) => {
-            if (!selectedAppointment || !organizationId) return
+            if (!selectedAppointment || !organizationId || !selectedNote) return
 
             try {
                 setIsSaving(true)
@@ -323,26 +327,15 @@ export function NotesTab({
                     return
                 }
 
-                const updateData = {
+                const updateData: UpdateClinicalNoteParams = {
                     content: noteData,
-                    updated_at: new Date().toISOString()
+                    status: selectedNote.status,
+                    updated_at: new Date().toISOString(),
+                    metadata: selectedNote.metadata || {},
+                    tags: selectedNote.tags || []
                 }
 
-                if (selectedNote) {
-                    await onUpdateNote(selectedNote.id, updateData)
-                } else {
-                    const newNote: CreateClinicalNoteParams = {
-                        appointment_id: selectedAppointment.id,
-                        patient_id: patientId,
-                        provider_id: providerId,
-                        organization_id: organizationId,
-                        content: noteData,
-                        type: 'manual',
-                        status: 'draft'
-                    }
-                    await createClinicalNote(newNote)
-                }
-
+                await onUpdateNote(selectedNote.id, updateData)
                 lastSavedContent.current = noteData
                 toast({
                     title: 'Note saved',
@@ -360,7 +353,7 @@ export function NotesTab({
                 setIsSaving(false)
             }
         }, 1500),
-        [selectedAppointment, organizationId, selectedNote, patientId, providerId]
+        [selectedAppointment?.id, organizationId, selectedNote]
     )
 
     // Update the handleVitalsChange function to handle empty values
@@ -461,12 +454,13 @@ export function NotesTab({
             setNewNote({
                 patient_id: patientId,
                 provider_id: providerId,
-                note_type: 'progress',
-                chief_complaint: '',
-                subjective: '',
-                objective: '',
-                assessment: '',
-                plan: '',
+                content: {
+                    subjective: '',
+                    objective: '',
+                    assessment: '',
+                    plan: ''
+                },
+                type: 'manual',
                 status: 'draft'
             })
         } catch (error) {
@@ -475,43 +469,16 @@ export function NotesTab({
     }
 
     const handleCreateNote = async () => {
-        if (!organizationId) {
+        if (!organizationId || !selectedAppointment) {
             toast({
                 title: 'Error',
-                description: 'Please log in with an organization account.',
-                variant: 'destructive'
-            })
-            return
-        }
-
-        if (isLoadingAppointments) {
-            toast({
-                title: 'Loading',
-                description: 'Please wait while appointments are being loaded.',
-                variant: 'default'
-            })
-            return
-        }
-
-        if (!selectedAppointment) {
-            toast({
-                title: 'Error',
-                description: 'Please select an appointment before creating a note.',
+                description: 'Please select an appointment and ensure you are logged in.',
                 variant: 'destructive'
             })
             return
         }
 
         try {
-            console.log('Creating note with data:', {
-                selectedAppointment,
-                patientId,
-                providerId,
-                organizationId,
-                noteContent,
-                selectedTemplate: selectedTemplate?.id
-            })
-
             const newNote: CreateClinicalNoteParams = {
                 appointment_id: selectedAppointment.id,
                 patient_id: patientId,
@@ -519,14 +486,12 @@ export function NotesTab({
                 organization_id: organizationId,
                 content: noteContent,
                 type: 'manual',
+                status: 'draft',
                 tags: [],
                 ...(selectedTemplate?.id ? { template_id: selectedTemplate.id } : {})
             }
 
-            console.log('Formatted note to save:', JSON.stringify(newNote, null, 2))
-            const createdNote = await createClinicalNote(newNote)
-            console.log('Note saved successfully:', createdNote)
-
+            await createClinicalNote(newNote)
             setNoteContent({
                 subjective: '',
                 objective: '',
@@ -557,8 +522,9 @@ export function NotesTab({
             const updateData: UpdateClinicalNoteParams = {
                 content: noteContent,
                 status: selectedNote.status,
-                metadata: selectedNote.metadata,
-                tags: selectedNote.tags
+                updated_at: new Date().toISOString(),
+                metadata: selectedNote.metadata || {},
+                tags: selectedNote.tags || []
             }
 
             await onUpdateNote(selectedNote.id, updateData)
@@ -642,8 +608,8 @@ export function NotesTab({
     }
 
     const handleAppointmentSelect = (value: string) => {
-        const appointment = findAppointment(value)
-        setSelectedAppointment(appointment)
+        const appointment = appointments.find(a => a.id === value)
+        setSelectedAppointment(appointment || null)
         if (appointment) {
             setIsCreatingNewNote(false)
         }
@@ -661,12 +627,12 @@ export function NotesTab({
     return (
         <div className="flex h-[calc(100vh-200px)]">
             {/* Main Content */}
-            <div className="flex-grow space-y-4 overflow-y-auto p-4">
+            <div className={cn(
+                "flex-grow space-y-4 overflow-y-auto p-4 transition-all duration-300",
+                showPreviousNotes ? "mr-8" : "mr-0"
+            )}>
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Session Notes</h2>
-                    <Button variant="outline" size="sm" onClick={() => setShowSidebar(!showSidebar)}>
-                        {showSidebar ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                    </Button>
                 </div>
 
                 {!selectedAppointment && !isCreatingNewNote ? (
@@ -704,7 +670,7 @@ export function NotesTab({
                                 <SelectValue placeholder="Select appointment to create a new note..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {appointments.map((appointment) => (
+                                {Array.isArray(appointments) && appointments.map((appointment) => (
                                     <SelectItem key={appointment.id} value={appointment.id}>
                                         {format(new Date(appointment.appointment_date), 'MMM d, yyyy')} {appointment.appointment_time} - {appointment.reason_for_visit}
                                     </SelectItem>
@@ -714,6 +680,7 @@ export function NotesTab({
                     </>
                 ) : (
                     <>
+
                         {/* Existing appointment selector */}
                         <Select
                             value={selectedAppointment?.id || ''}
@@ -730,6 +697,10 @@ export function NotesTab({
                                 ))}
                             </SelectContent>
                         </Select>
+                        {/* Appointment Details */}
+                        {selectedAppointment && (
+                            <AppointmentDetails appointment={selectedAppointment} />
+                        )}
 
                         {/* Note editor */}
                         {selectedAppointment && (
@@ -742,9 +713,6 @@ export function NotesTab({
                                                 <h3 className="font-semibold text-lg">
                                                     {activeNote ? 'Edit Session Note' : 'New Session Note'}
                                                 </h3>
-                                                <Badge variant="outline" className="text-xs">
-                                                    {format(new Date(selectedAppointment?.appointment_date || ''), 'MMM d, yyyy')}
-                                                </Badge>
                                                 {selectedTemplate && (
                                                     <Badge variant="secondary" className="gap-1">
                                                         Template: {selectedTemplate.name}
@@ -766,10 +734,18 @@ export function NotesTab({
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="gap-2 group"
+                                                            className={cn(
+                                                                "gap-2 group relative overflow-hidden border-primary/20",
+                                                                "bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-pink-500/10",
+                                                                "hover:from-purple-500/20 hover:via-blue-500/20 hover:to-pink-500/20",
+                                                                "transition-all duration-500"
+                                                            )}
                                                         >
-                                                            <Sparkles className="h-4 w-4 text-primary group-hover:animate-pulse" />
-                                                            <span className="text-sm">AI Assistant</span>
+                                                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 animate-gradient-xy" />
+                                                            <Sparkles className="h-4 w-4 text-blue-500 animate-pulse group-hover:text-blue-600" />
+                                                            <span className="text-sm relative z-10 bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text font-medium">
+                                                                AI Assistant
+                                                            </span>
                                                         </Button>
                                                     </PopoverTrigger>
                                                     <PopoverContent
@@ -793,14 +769,21 @@ export function NotesTab({
 
                                                 {/* Voice Recording Toggle */}
                                                 <Button
-                                                    variant={isRecording ? "destructive" : "secondary"}
-                                                    size="icon"
+                                                    variant={isRecording ? "destructive" : "outline"}
+                                                    size="sm"
                                                     onClick={() => setIsRecording(!isRecording)}
+                                                    className={cn(
+                                                        "relative overflow-hidden transition-all duration-300",
+                                                        isRecording && "animate-pulse bg-red-500 hover:bg-red-600 border-red-400"
+                                                    )}
                                                 >
                                                     {isRecording ? (
-                                                        <MicOff className="h-4 w-4" />
+                                                        <>
+                                                            <div className="absolute inset-0 bg-red-500/20 animate-ping" />
+                                                            <MicOff className="h-4 w-4 relative z-10" />
+                                                        </>
                                                     ) : (
-                                                        <Mic className="h-4 w-4" />
+                                                        <Mic className="h-4 w-4 text-red-500" />
                                                     )}
                                                 </Button>
 
@@ -820,6 +803,20 @@ export function NotesTab({
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Voice Recorder */}
+                                    {isRecording && (
+                                        <div className="border rounded-lg p-4 bg-gradient-to-br from-primary/5 via-background to-primary/5 mb-4 relative overflow-hidden">
+                                            <div className="absolute inset-0 bg-grid-primary/5 mask-gradient animate-grid-flow" />
+                                            <div className="relative z-10">
+                                                <VoiceRecorder
+                                                    isRecording={isRecording}
+                                                    onToggleRecording={() => setIsRecording(!isRecording)}
+                                                    onTranscriptionComplete={handleVoiceRecordingComplete}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Vitals Section */}
                                     <Card className="mb-6">
@@ -992,20 +989,6 @@ export function NotesTab({
                                         </CardContent>
                                     </Card>
 
-                                    {/* Voice Recorder */}
-                                    {isRecording && (
-                                        <div className="border rounded-lg p-4 bg-gradient-to-br from-primary/5 via-background to-primary/5 mb-4 relative overflow-hidden">
-                                            <div className="absolute inset-0 bg-grid-primary/5 mask-gradient animate-grid-flow" />
-                                            <div className="relative z-10">
-                                                <VoiceRecorder
-                                                    isRecording={isRecording}
-                                                    onToggleRecording={() => setIsRecording(!isRecording)}
-                                                    onTranscriptionComplete={handleVoiceRecordingComplete}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* SOAP Note Structure */}
                                     <div className="space-y-6">
                                         {sections.map((section: NoteSection) => (
@@ -1041,6 +1024,16 @@ export function NotesTab({
                 )}
             </div>
 
+            {/* Previous Session Notes Panel */}
+            <div className="h-full">
+                <PreviousSessionNotes
+                    notes={notes}
+                    onSelectNote={handleNoteSelection}
+                    isExpanded={showPreviousNotes}
+                    onToggleExpand={() => setShowPreviousNotes(!showPreviousNotes)}
+                />
+            </div>
+
             {/* Add saving indicator */}
             {isSaving && (
                 <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-md shadow-lg flex items-center gap-2">
@@ -1074,6 +1067,23 @@ export function NotesTab({
 
     .mask-gradient {
         mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+    }
+
+    @keyframes gradient-xy {
+        0% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+        100% {
+            background-position: 0% 50%;
+        }
+    }
+
+    .animate-gradient-xy {
+        animation: gradient-xy 3s ease infinite;
+        background-size: 400% 400%;
     }
 `}</style>
 
