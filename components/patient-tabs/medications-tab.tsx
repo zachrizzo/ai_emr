@@ -8,8 +8,8 @@ import { toast } from "@/components/ui/use-toast"
 import { EditMedicationDialog } from '@/components/edit-medication-dialog'
 import { PlusCircle } from 'lucide-react'
 import { format } from 'date-fns'
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+import { useUser } from '@/contexts/UserContext'
+import { supabase } from '@/utils/supabase-config'
 
 interface MedicationsTabProps {
   patientId: string
@@ -19,6 +19,7 @@ export function MedicationsTab({ patientId }: MedicationsTabProps) {
   const [medications, setMedications] = useState<Medication[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isEditingMedication, setIsEditingMedication] = useState(false)
+  const { userData } = useUser()
 
   useEffect(() => {
     fetchMedications()
@@ -50,19 +51,34 @@ export function MedicationsTab({ patientId }: MedicationsTabProps) {
     try {
       const { data, error } = await supabase
         .from('medications')
-        .upsert({ ...updatedMedication, patient_id: patientId })
+        .upsert({
+          ...updatedMedication,
+          patient_id: patientId,
+          organization_id: userData?.organization_id,
+          prescribed_by: userData?.id
+        })
         .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error details:', error)
+        throw error
+      }
 
       if (data && data.length > 0) {
-        setMedications(prevMedications =>
-          prevMedications.map(item => item.id === updatedMedication.id ? data[0] : item)
-        )
+        // If the medication has an ID, it's an update, otherwise it's a new addition
+        if (updatedMedication.id) {
+          setMedications(prevMedications =>
+            prevMedications.map(item => item.id === updatedMedication.id ? data[0] : item)
+          )
+        } else {
+          setMedications(prevMedications => [...prevMedications, data[0]])
+        }
+
         toast({
           title: "Success",
-          description: "Medication updated successfully.",
+          description: `Medication ${updatedMedication.id ? 'updated' : 'added'} successfully.`,
         })
+        setIsEditingMedication(false)
       } else {
         throw new Error("No data returned after upsert")
       }
@@ -70,7 +86,7 @@ export function MedicationsTab({ patientId }: MedicationsTabProps) {
       console.error("Error updating medication:", error)
       toast({
         title: "Error",
-        description: "Failed to update medication. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update medication. Please try again.",
         variant: "destructive",
       })
     }
@@ -121,13 +137,13 @@ export function MedicationsTab({ patientId }: MedicationsTabProps) {
             { header: 'Medication Name', accessorKey: 'medication_name' },
             { header: 'Dosage', accessorKey: 'dosage' },
             { header: 'Frequency', accessorKey: 'frequency' },
-            { 
-              header: 'Start Date', 
+            {
+              header: 'Start Date',
               accessorKey: 'start_date',
               cell: ({ row }) => format(new Date(row.original.start_date), 'MMM d, yyyy')
             },
-            { 
-              header: 'End Date', 
+            {
+              header: 'End Date',
               accessorKey: 'end_date',
               cell: ({ row }) => row.original.end_date ? format(new Date(row.original.end_date), 'MMM d, yyyy') : 'Ongoing'
             },

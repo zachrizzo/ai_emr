@@ -8,8 +8,9 @@ import { toast } from "@/components/ui/use-toast"
 import { EditImmunizationDialog } from '@/components/edit-immunization-dialog'
 import { PlusCircle } from 'lucide-react'
 import { format } from 'date-fns'
+import { useUser } from '@/contexts/UserContext'
+import { supabase } from '@/utils/supabase-config'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 interface ImmunizationsTabProps {
   patientId: string
@@ -19,6 +20,7 @@ export function ImmunizationsTab({ patientId }: ImmunizationsTabProps) {
   const [immunizations, setImmunizations] = useState<Immunization[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isEditingImmunization, setIsEditingImmunization] = useState(false)
+  const { userData } = useUser()
 
   useEffect(() => {
     fetchImmunizations()
@@ -50,19 +52,33 @@ export function ImmunizationsTab({ patientId }: ImmunizationsTabProps) {
     try {
       const { data, error } = await supabase
         .from('immunizations')
-        .upsert({ ...updatedImmunization, patient_id: patientId })
+        .upsert({
+          ...updatedImmunization,
+          patient_id: patientId,
+          organization_id: userData?.organization_id,
+          administered_by: userData?.id
+        })
         .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error details:', error)
+        throw error
+      }
 
       if (data && data.length > 0) {
-        setImmunizations(prevImmunizations =>
-          prevImmunizations.map(item => item.id === updatedImmunization.id ? data[0] : item)
-        )
+        if (updatedImmunization.id) {
+          setImmunizations(prevImmunizations =>
+            prevImmunizations.map(item => item.id === updatedImmunization.id ? data[0] : item)
+          )
+        } else {
+          setImmunizations(prevImmunizations => [...prevImmunizations, data[0]])
+        }
+
         toast({
           title: "Success",
-          description: "Immunization updated successfully.",
+          description: `Immunization ${updatedImmunization.id ? 'updated' : 'added'} successfully.`,
         })
+        setIsEditingImmunization(false)
       } else {
         throw new Error("No data returned after upsert")
       }
@@ -70,7 +86,7 @@ export function ImmunizationsTab({ patientId }: ImmunizationsTabProps) {
       console.error("Error updating immunization:", error)
       toast({
         title: "Error",
-        description: "Failed to update immunization. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update immunization. Please try again.",
         variant: "destructive",
       })
     }
@@ -119,8 +135,8 @@ export function ImmunizationsTab({ patientId }: ImmunizationsTabProps) {
           data={immunizations}
           columns={[
             { header: 'Vaccine Name', accessorKey: 'vaccine_name' },
-            { 
-              header: 'Date Administered', 
+            {
+              header: 'Date Administered',
               accessorKey: 'date_administered',
               cell: ({ row }) => format(new Date(row.original.date_administered), 'MMM d, yyyy')
             },

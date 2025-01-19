@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Overview } from '@/components/overview'
 import { RecentPatients } from '@/components/recent-patients'
-import { FloatingChat } from '@/components/messaging/floating-chat'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/utils/supabase-config'
 import { useUser } from '@/contexts/UserContext'
@@ -208,10 +207,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <FloatingChat
-        initialConversationId="example-conversation-id"
-        initialMessageId="example-message-id"
-      />
     </div>
   )
 }

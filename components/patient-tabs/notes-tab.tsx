@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -17,7 +17,7 @@ import { NotesHistory } from "@/components/ui/notes-history"
 import { VoiceRecorder } from "@/components/ui/voice-recorder"
 import { NoteTemplateSelector } from "@/components/ui/note-template-selector"
 import { AIAssistant } from "@/components/messaging/ai-assistant"
-import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate, SessionNote } from '@/types'
+import { ClinicalNote, CreateClinicalNoteParams, UpdateClinicalNoteParams, NoteTemplate, SessionNote, Vitals, VitalRanges } from '@/types'
 import { format } from 'date-fns'
 import { Mic, MicOff, Save, FileText, Sparkles, X, ChevronLeft, ChevronRight, Search, ArrowLeft } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"
@@ -43,6 +43,8 @@ import { useUser } from '@/contexts/UserContext'
 import { cn } from "@/lib/utils"
 import { Appointment } from '@/types/notes'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Textarea } from '@/components/ui/textarea'
+import { debounce } from 'lodash'
 
 type NoteSection = 'subjective' | 'objective' | 'assessment' | 'plan'
 
@@ -68,6 +70,26 @@ interface NotesTabProps {
     onEditNote: (note: ClinicalNote | null) => void
 }
 
+// Add vital ranges constant
+const VITAL_RANGES: VitalRanges = {
+    temperature: { min: 90, max: 110 },
+    blood_pressure_systolic: { min: 60, max: 250 },
+    blood_pressure_diastolic: { min: 40, max: 150 },
+    heart_rate: { min: 30, max: 250 },
+    respiratory_rate: { min: 8, max: 60 },
+    oxygen_saturation: { min: 0, max: 100 },
+    height: { min: 0, max: 300 },
+    weight: { min: 0, max: 700 },
+    pain_level: { min: 0, max: 10 },
+    blood_glucose: { min: 20, max: 600 }  // Added blood glucose range (mg/dL)
+}
+
+// Add validation helper
+const isVitalInRange = (field: keyof VitalRanges, value: number): boolean => {
+    const range = VITAL_RANGES[field]
+    return value >= range.min && value <= range.max
+}
+
 export function NotesTab({
     patientId,
     providerId,
@@ -84,6 +106,33 @@ export function NotesTab({
         : []
     const isLoadingAppointments = appointmentContext?.isLoading ?? false
     const fetchAppointments = appointmentContext?.fetchAppointments ?? (async () => { })
+    const [vitals, setVitals] = useState<Vitals | null>(null)
+    const [newNote, setNewNote] = useState<Partial<ClinicalNote>>({
+        patient_id: patientId,
+        provider_id: providerId,
+        note_type: 'progress',
+        chief_complaint: '',
+        subjective: '',
+        objective: '',
+        assessment: '',
+        plan: '',
+        status: 'draft'
+    })
+    const [newVitals, setNewVitals] = useState<Partial<Vitals>>({
+        patient_id: patientId,
+        provider_id: providerId,
+        temperature: undefined,
+        blood_pressure_systolic: undefined,
+        blood_pressure_diastolic: undefined,
+        heart_rate: undefined,
+        respiratory_rate: undefined,
+        oxygen_saturation: undefined,
+        height: undefined,
+        weight: undefined,
+        bmi: undefined,
+        pain_level: undefined,
+        blood_glucose: undefined
+    })
 
     const findAppointment = (appointmentId?: string): Appointment | null => {
         if (!appointmentId || !appointments?.length) return null
@@ -113,6 +162,9 @@ export function NotesTab({
     })
     const [isCreatingNewNote, setIsCreatingNewNote] = useState(false)
     const [selectedNote, setSelectedNote] = useState<ClinicalNote | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const lastSavedContent = useRef<NoteContent | null>(null)
+    const lastSavedVitals = useRef<Partial<Vitals> | null>(null)
 
     useEffect(() => {
         console.log('Appointments context:', appointments)
@@ -135,6 +187,7 @@ export function NotesTab({
         loadTemplates()
         // Fetch appointments when component mounts
         fetchAppointments(patientId)
+        fetchLatestVitals()
 
         const unsubscribe = subscribeToClinicalNotes(
             patientId,
@@ -201,6 +254,223 @@ export function NotesTab({
                 description: 'Failed to load templates. Please try again.',
                 variant: 'destructive',
             })
+        }
+    }
+
+    const fetchLatestVitals = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('vitals')
+                .select('*')
+                .eq('patient_id', patientId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            if (error && error.code !== 'PGRST116') throw error
+            setVitals(data || null)
+        } catch (error) {
+            console.error('Error fetching vitals:', error)
+        }
+    }
+
+    // Debounced save functions
+    const debouncedSaveVitals = useCallback(
+        debounce(async (vitalsData: Partial<Vitals>) => {
+            if (!selectedAppointment || !organizationId) return
+
+            try {
+                setIsSaving(true)
+                const { error } = await supabase
+                    .from('vitals')
+                    .insert([{
+                        ...vitalsData,
+                        appointment_id: selectedAppointment.id,
+                        clinical_note_id: selectedNote?.id,
+                        organization_id: organizationId,
+                        created_at: new Date().toISOString()
+                    }])
+
+                if (error) throw error
+                lastSavedVitals.current = vitalsData
+                fetchLatestVitals()
+                toast({
+                    title: 'Vitals saved',
+                    variant: 'default',
+                    duration: 1000
+                })
+            } catch (error) {
+                console.error('Error auto-saving vitals:', error)
+                toast({
+                    title: 'Error saving vitals',
+                    description: 'Your changes will be saved when connection is restored',
+                    variant: 'destructive'
+                })
+            } finally {
+                setIsSaving(false)
+            }
+        }, 1500),
+        [selectedAppointment?.id, organizationId, selectedNote?.id]
+    )
+
+    const debouncedSaveNote = useCallback(
+        debounce(async (noteData: NoteContent) => {
+            if (!selectedAppointment || !organizationId) return
+
+            try {
+                setIsSaving(true)
+                if (JSON.stringify(noteData) === JSON.stringify(lastSavedContent.current)) {
+                    return
+                }
+
+                const updateData = {
+                    content: noteData,
+                    updated_at: new Date().toISOString()
+                }
+
+                if (selectedNote) {
+                    await onUpdateNote(selectedNote.id, updateData)
+                } else {
+                    const newNote: CreateClinicalNoteParams = {
+                        appointment_id: selectedAppointment.id,
+                        patient_id: patientId,
+                        provider_id: providerId,
+                        organization_id: organizationId,
+                        content: noteData,
+                        type: 'manual',
+                        status: 'draft'
+                    }
+                    await createClinicalNote(newNote)
+                }
+
+                lastSavedContent.current = noteData
+                toast({
+                    title: 'Note saved',
+                    variant: 'default',
+                    duration: 1000
+                })
+            } catch (error) {
+                console.error('Error auto-saving note:', error)
+                toast({
+                    title: 'Error saving note',
+                    description: 'Your changes will be saved when connection is restored',
+                    variant: 'destructive'
+                })
+            } finally {
+                setIsSaving(false)
+            }
+        }, 1500),
+        [selectedAppointment, organizationId, selectedNote, patientId, providerId]
+    )
+
+    // Update the handleVitalsChange function to handle empty values
+    const handleVitalsChange = (field: keyof Vitals, value: number) => {
+        if (isNaN(value) || value === null) {
+            const updatedVitals = {
+                ...newVitals,
+                [field]: undefined
+            }
+            setNewVitals(updatedVitals)
+            return
+        }
+
+        // Validate the value is within range
+        if (!isVitalInRange(field as keyof VitalRanges, value)) {
+            toast({
+                title: 'Warning',
+                description: `${field.replace(/_/g, ' ')} value is outside normal range`,
+                variant: 'default'
+            })
+        }
+
+        const updatedVitals = {
+            ...newVitals,
+            [field]: value,
+            bmi: field === 'height' || field === 'weight'
+                ? calculateBMI(
+                    field === 'weight' ? value : (newVitals.weight || 0),
+                    field === 'height' ? value : (newVitals.height || 0)
+                )
+                : newVitals.bmi
+        }
+
+        // Only save if we have all required values for blood pressure
+        if ((field === 'blood_pressure_systolic' || field === 'blood_pressure_diastolic') &&
+            (!updatedVitals.blood_pressure_systolic || !updatedVitals.blood_pressure_diastolic)) {
+            setNewVitals(updatedVitals)
+            return
+        }
+
+        setNewVitals(updatedVitals)
+        debouncedSaveVitals(updatedVitals)
+    }
+
+    // Update the note content change handler
+    const handleNoteContentChange = (section: NoteSection, value: string) => {
+        const updatedContent = {
+            ...noteContent,
+            [section]: value
+        }
+        setNoteContent(updatedContent)
+        debouncedSaveNote(updatedContent)
+    }
+
+    // Clean up debounced functions on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSaveVitals.cancel()
+            debouncedSaveNote.cancel()
+        }
+    }, [])
+
+    const calculateBMI = (weight: number, height: number) => {
+        if (height <= 0) return 0
+        const heightInMeters = height / 100
+        return Number((weight / (heightInMeters * heightInMeters)).toFixed(1))
+    }
+
+    const saveVitals = async () => {
+        try {
+            const { error } = await supabase
+                .from('vitals')
+                .insert([{ ...newVitals, created_at: new Date().toISOString() }])
+
+            if (error) throw error
+            fetchLatestVitals()
+        } catch (error) {
+            console.error('Error saving vitals:', error)
+        }
+    }
+
+    const handleNoteChange = (field: keyof ClinicalNote, value: string) => {
+        setNewNote(prev => ({ ...prev, [field]: value }))
+    }
+
+    const saveNote = async () => {
+        try {
+            const { error } = await supabase
+                .from('clinical_notes')
+                .insert([{
+                    ...newNote,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }])
+
+            if (error) throw error
+            loadNotes()
+            setNewNote({
+                patient_id: patientId,
+                provider_id: providerId,
+                note_type: 'progress',
+                chief_complaint: '',
+                subjective: '',
+                objective: '',
+                assessment: '',
+                plan: '',
+                status: 'draft'
+            })
+        } catch (error) {
+            console.error('Error saving note:', error)
         }
     }
 
@@ -551,6 +821,177 @@ export function NotesTab({
                                         </div>
                                     </div>
 
+                                    {/* Vitals Section */}
+                                    <Card className="mb-6">
+                                        <CardHeader>
+                                            <CardTitle className="flex justify-between items-center">
+                                                <span>Patient Vitals</span>
+                                                {vitals && (
+                                                    <span className="text-sm text-muted-foreground">
+                                                        Last updated: {format(new Date(vitals.created_at), 'MMM d, yyyy h:mm a')}
+                                                    </span>
+                                                )}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Temperature (°F)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.temperature || ''}
+                                                        onChange={(e) => handleVitalsChange('temperature', parseFloat(e.target.value))}
+                                                        step="0.1"
+                                                        placeholder="98.6"
+                                                        className={cn(
+                                                            newVitals.temperature && !isVitalInRange('temperature', newVitals.temperature) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Blood Pressure (Systolic)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.blood_pressure_systolic || ''}
+                                                        onChange={(e) => handleVitalsChange('blood_pressure_systolic', parseInt(e.target.value))}
+                                                        placeholder="120"
+                                                        className={cn(
+                                                            newVitals.blood_pressure_systolic && !isVitalInRange('blood_pressure_systolic', newVitals.blood_pressure_systolic) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Blood Pressure (Diastolic)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.blood_pressure_diastolic || ''}
+                                                        onChange={(e) => handleVitalsChange('blood_pressure_diastolic', parseInt(e.target.value))}
+                                                        placeholder="80"
+                                                        className={cn(
+                                                            newVitals.blood_pressure_diastolic && !isVitalInRange('blood_pressure_diastolic', newVitals.blood_pressure_diastolic) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Heart Rate (bpm)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.heart_rate || ''}
+                                                        onChange={(e) => handleVitalsChange('heart_rate', parseInt(e.target.value))}
+                                                        placeholder="72"
+                                                        className={cn(
+                                                            newVitals.heart_rate && !isVitalInRange('heart_rate', newVitals.heart_rate) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Respiratory Rate</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.respiratory_rate || ''}
+                                                        onChange={(e) => handleVitalsChange('respiratory_rate', parseInt(e.target.value))}
+                                                        placeholder="16"
+                                                        className={cn(
+                                                            newVitals.respiratory_rate && !isVitalInRange('respiratory_rate', newVitals.respiratory_rate) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>O2 Saturation (%)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.oxygen_saturation || ''}
+                                                        onChange={(e) => handleVitalsChange('oxygen_saturation', parseInt(e.target.value))}
+                                                        placeholder="98"
+                                                        className={cn(
+                                                            newVitals.oxygen_saturation && !isVitalInRange('oxygen_saturation', newVitals.oxygen_saturation) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Height (cm)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.height || ''}
+                                                        onChange={(e) => handleVitalsChange('height', parseInt(e.target.value))}
+                                                        placeholder="170"
+                                                        className={cn(
+                                                            newVitals.height && !isVitalInRange('height', newVitals.height) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Weight (kg)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.weight || ''}
+                                                        onChange={(e) => handleVitalsChange('weight', parseInt(e.target.value))}
+                                                        placeholder="70"
+                                                        className={cn(
+                                                            newVitals.weight && !isVitalInRange('weight', newVitals.weight) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>BMI</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.bmi || ''}
+                                                        disabled
+                                                        className="bg-muted"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Pain Level (0-10)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.pain_level || ''}
+                                                        onChange={(e) => handleVitalsChange('pain_level', parseInt(e.target.value))}
+                                                        min="0"
+                                                        max="10"
+                                                        placeholder="0"
+                                                        className={cn(
+                                                            newVitals.pain_level && !isVitalInRange('pain_level', newVitals.pain_level) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Blood Glucose (mg/dL)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={newVitals.blood_glucose || ''}
+                                                        onChange={(e) => handleVitalsChange('blood_glucose', parseInt(e.target.value))}
+                                                        placeholder="100"
+                                                        className={cn(
+                                                            newVitals.blood_glucose && !isVitalInRange('blood_glucose', newVitals.blood_glucose) &&
+                                                            "border-yellow-500 focus:ring-yellow-500"
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-4">
+                                                <div className="text-sm text-muted-foreground">
+                                                    {vitals && (
+                                                        <span>Previous vitals available from {format(new Date(vitals.created_at), 'MMM d, yyyy')}</span>
+                                                    )}
+                                                </div>
+                                                <Button onClick={saveVitals} className="gap-2">
+                                                    <Save className="h-4 w-4" />
+                                                    Save Vitals
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
                                     {/* Voice Recorder */}
                                     {isRecording && (
                                         <div className="border rounded-lg p-4 bg-gradient-to-br from-primary/5 via-background to-primary/5 mb-4 relative overflow-hidden">
@@ -585,12 +1026,7 @@ export function NotesTab({
                                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     <TipTapEditor
                                                         content={noteContent[section]}
-                                                        onChange={(value) => {
-                                                            setNoteContent(prev => ({
-                                                                ...prev,
-                                                                [section]: value
-                                                            }))
-                                                        }}
+                                                        onChange={(value) => handleNoteContentChange(section, value)}
                                                         editable={!isRecording}
                                                         placeholder={`Enter ${section} information...`}
                                                     />
@@ -604,6 +1040,14 @@ export function NotesTab({
                     </>
                 )}
             </div>
+
+            {/* Add saving indicator */}
+            {isSaving && (
+                <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-4 py-2 rounded-md shadow-lg flex items-center gap-2">
+                    <span className="animate-spin">⌛</span>
+                    Saving...
+                </div>
+            )}
         </div>
     )
 }

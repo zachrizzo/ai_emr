@@ -1,6 +1,5 @@
 'use client'
 
-import { FloatingChat } from '@/components/messaging/floating-chat'
 import { cn } from '@/lib/utils'
 import { GripVertical } from 'lucide-react'
 import { useState, useRef } from 'react'
@@ -54,10 +53,7 @@ export function ClientLayout({
                         isDragging && "cursor-grabbing"
                     )}
                 >
-                    <FloatingChat
-                        initialConversationId="example-conversation-id"
-                        initialMessageId="example-message-id"
-                    />
+
                     <div
                         className="absolute top-2 left-2 cursor-grab p-1 rounded hover:bg-gray-100"
                         onMouseDown={handleMouseDown}

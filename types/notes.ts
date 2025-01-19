@@ -1,5 +1,5 @@
 export type NoteType = 'voice' | 'manual' | 'template' | 'ai_assisted';
-export type NoteStatus = 'draft' | 'final' | 'signed' | 'amended';
+export type NoteStatus = 'draft' | 'completed' | 'pending' | 'archived';
 export type SectionType = 'subjective' | 'objective' | 'assessment' | 'plan' | 'custom';
 export type AccessAction = 'view' | 'edit' | 'sign' | 'print' | 'share';
 
@@ -15,46 +15,27 @@ export interface NoteTemplate {
   organization_id: string;
 }
 
+export interface NoteContent {
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+}
+
 export interface ClinicalNote {
   id: string;
   patient_id: string;
   provider_id: string;
-  appointment_id?: string;
   organization_id: string;
-  content: any; // Rich text content
-  type: NoteType;
+  appointment_id: string;
+  content: NoteContent;
+  type: 'manual' | 'ai' | 'voice';
   status: NoteStatus;
-  version: number;
-  parent_note_id?: string;
-  template_id?: string;
-  metadata?: {
-    specialty?: string;
-    templateType?: string;
-    diagnosis?: string[];
-    procedures?: string[];
-    vitals?: {
-      bloodPressure?: string;
-      heartRate?: string;
-      temperature?: string;
-      respiratoryRate?: string;
-      oxygenSaturation?: string;
-    };
-    customFields?: Record<string, any>;
-  };
-  tags: string[];
-  is_deleted: boolean;
   created_at: string;
   updated_at: string;
-  signed_at?: string;
-  signed_by?: string;
-  sections?: NoteSection[];
-  attachments?: NoteAttachment[];
-  comments?: NoteComment[];
-  voice_recording?: VoiceRecording;
-  provider?: {
-    id: string;
-    full_name: string;
-  };
+  metadata?: Record<string, any>;
+  tags?: string[];
+  version?: number;
 }
 
 export interface NoteSection {
@@ -127,42 +108,28 @@ export interface AIAssistance {
 export interface CreateClinicalNoteParams {
   patient_id: string;
   provider_id: string;
-  appointment_id?: string;
   organization_id: string;
-  content: any;
-  type: NoteType;
-  template_id?: string;
-  metadata?: ClinicalNote['metadata'];
-  tags: string[];
-  sections?: Omit<NoteSection, 'id' | 'note_id' | 'created_at' | 'updated_at'>[];
+  appointment_id: string;
+  content: NoteContent;
+  type: 'manual' | 'ai' | 'voice';
+  status: NoteStatus;
+  metadata?: Record<string, any>;
+  tags?: string[];
 }
 
 export interface UpdateClinicalNoteParams {
-  content?: any;
-  metadata?: ClinicalNote['metadata'];
-  tags?: string[];
-  sections?: Omit<NoteSection, 'id' | 'note_id' | 'created_at' | 'updated_at'>[];
+  content?: NoteContent;
   status?: NoteStatus;
+  metadata?: Record<string, any>;
+  tags?: string[];
+  updated_at: string;
 }
 
-export interface SessionNote {
-  id: string;
-  patient_id: string;
-  provider_id: string;
-  appointment_id?: string;
-  organization_id: string;
-  content: {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    plan: string;
-  };
-  type?: 'voice' | 'manual' | 'template' | 'ai_assisted';
-  status?: 'draft' | 'final' | 'signed' | 'amended';
-  version?: number;
-  template_id?: string;
-  created_at: string;
-  updated_at: string;
+export interface SessionNote extends ClinicalNote {
+  visit_type?: string;
+  chief_complaint?: string;
+  diagnosis?: string[];
+  treatment_plan?: string;
 }
 
 export interface Appointment {
