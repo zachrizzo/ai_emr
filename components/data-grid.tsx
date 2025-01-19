@@ -32,7 +32,7 @@ interface DataGridProps<TData, TValue> {
   onEdit?: (row: TData) => void
   onDelete?: (selectedRows: TData[]) => void
   onRowSelectionChange?: (selectedRows: TData[]) => void
-  filterColumn?: string
+  filterColumnName?: string
 }
 
 export function DataGrid<TData, TValue>({
@@ -41,7 +41,7 @@ export function DataGrid<TData, TValue>({
   onEdit,
   onDelete,
   onRowSelectionChange,
-  filterColumn = 'name'
+  filterColumnName = 'name'
 }: DataGridProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -57,6 +57,7 @@ export function DataGrid<TData, TValue>({
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
     state: {
       sorting,
       columnFilters,
@@ -79,14 +80,17 @@ export function DataGrid<TData, TValue>({
     }
   }
 
+  const filterableColumn = table.getColumn(filterColumnName)
+  const filterValue = filterableColumn?.getFilterValue() as string ?? ''
+
   return (
     <div>
       <div className="flex items-center justify-between py-4">
         <Input
           placeholder="Filter..."
-          value={(table.getColumn(filterColumn)?.getFilterValue() as string) ?? ''}
+          value={filterValue}
           onChange={(event) =>
-            table.getColumn(filterColumn)?.setFilterValue(event.target.value)
+            filterableColumn?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -108,7 +112,7 @@ export function DataGrid<TData, TValue>({
               {onDelete && (
                 <TableHead className="w-[50px]">
                   <Checkbox
-                    checked={table.getIsAllPageRowsSelected()}
+                    checked={table.getRowModel().rows.length > 0 ? table.getIsAllPageRowsSelected() : false}
                     onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
                     aria-label="Select all"
                   />

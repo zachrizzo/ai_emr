@@ -25,19 +25,31 @@ function DocumentBuilderContent() {
   const [selectedTemplates, setSelectedTemplates] = useState<DocumentTemplate[]>([])
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
   const router = useRouter()
-  const { user } = useUser()
+  const { user, loading: userLoading } = useUser()
 
   useEffect(() => {
-    if (user) {
-      fetchTemplates()
+    const loadTemplates = async () => {
+      if (user && !userLoading) {
+        try {
+          await fetchTemplates()
+        } catch (error) {
+          console.error('Error fetching templates:', error)
+          toast({
+            title: "Error",
+            description: "Failed to load templates. Please try again.",
+            variant: "destructive",
+          })
+        }
+      }
     }
-  }, [fetchTemplates, user])
+    loadTemplates()
+  }, [fetchTemplates, user, userLoading])
 
   const handleNewTemplate = async () => {
     if (!user) {
       toast({
-        title: "Error",
-        description: "You must be logged in to create a template.",
+        title: "Authentication Required",
+        description: "Please sign in to create a new template.",
         variant: "destructive",
       })
       return
@@ -47,14 +59,12 @@ function DocumentBuilderContent() {
       const newTemplate = await createNewTemplate()
       if (newTemplate?.id) {
         router.push(`/document-builder/${newTemplate.id}`)
-      } else {
-        throw new Error('Failed to create template')
       }
     } catch (error) {
-      console.error('Error creating new template:', error)
+      console.error('Error creating template:', error)
       toast({
         title: "Error",
-        description: "Failed to create a new template. Please try again.",
+        description: "Failed to create new template. Please try again.",
         variant: "destructive",
       })
     }
@@ -84,12 +94,22 @@ function DocumentBuilderContent() {
     }
 
     try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
+      }
+
       const templateIds = templatesToDelete.map(template => template.id)
       const { error } = await supabase
         .from('document_templates')
         .delete()
         .in('id', templateIds)
-        .eq('organization_id', user.organization_id)
+        .eq('organization_id', userData.organization_id)
 
       if (error) throw error
 

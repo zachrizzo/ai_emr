@@ -20,7 +20,8 @@ import { useUser } from '@/contexts/UserContext'
 
 interface Patient {
   id: string
-  full_name: string
+  first_name: string
+  last_name: string
   date_of_birth: string
   organization_id: string
 }
@@ -38,20 +39,30 @@ export function AssignTemplateModal({ isOpen, onClose, templates }: AssignTempla
   const { user } = useUser()
 
   useEffect(() => {
-    if (user) { // Only fetch patients if user is logged in
+    if (user) {
       fetchPatients()
     }
   }, [user])
 
   const fetchPatients = async () => {
-    if (!user) return; // Don't fetch if no user
+    if (!user) return
 
     try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
+      }
+
       const { data, error } = await supabase
         .from('patients')
-        .select('id, full_name, date_of_birth, organization_id')
-        .eq('organization_id', user.organization_id) // Filter by organization
-        .order('full_name')
+        .select('id, first_name, last_name, date_of_birth, organization_id')
+        .eq('organization_id', userData.organization_id)
+        .order('last_name', { ascending: true })
 
       if (error) throw error
       setPatients(data)
@@ -66,15 +77,25 @@ export function AssignTemplateModal({ isOpen, onClose, templates }: AssignTempla
   }
 
   const handleAssign = async () => {
-    if (!user) return; // Don't assign if no user
+    if (!user) return
     if (templates.length === 0 || selectedPatients.length === 0) return
 
     try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
+      }
+
       const assignments = templates.flatMap(template =>
         selectedPatients.map(patientId => ({
           document_template_id: template.id,
           patient_id: patientId,
-          organization_id: user.organization_id, // Use organization ID from context
+          organization_id: userData.organization_id,
           is_visible_on_portal: true,
           assigned_at: new Date().toISOString(),
           due_at: addDays(new Date(), 7).toISOString(),
@@ -82,7 +103,7 @@ export function AssignTemplateModal({ isOpen, onClose, templates }: AssignTempla
         }))
       )
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('assigned_documents')
         .insert(assignments)
         .select()
@@ -105,7 +126,7 @@ export function AssignTemplateModal({ isOpen, onClose, templates }: AssignTempla
   }
 
   const filteredPatients = patients.filter(patient =>
-    patient.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${patient.first_name} ${patient.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     format(new Date(patient.date_of_birth), 'MM/dd/yyyy').includes(searchTerm)
   )
 
@@ -140,7 +161,7 @@ export function AssignTemplateModal({ isOpen, onClose, templates }: AssignTempla
                   }}
                 />
                 <Label htmlFor={`patient-${patient.id}`} className="text-sm">
-                  {patient.full_name} ({format(new Date(patient.date_of_birth), 'MM/dd/yyyy')})
+                  {`${patient.first_name} ${patient.last_name}`} ({format(new Date(patient.date_of_birth), 'MM/dd/yyyy')})
                 </Label>
               </div>
             ))}

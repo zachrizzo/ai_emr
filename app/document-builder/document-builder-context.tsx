@@ -12,16 +12,7 @@ import { supabase } from '@/utils/supabase-config'
 import { v4 as uuidv4 } from 'uuid'
 import type { User } from '@/types/user'
 import { useUser } from '@/contexts/UserContext'
-
-export interface Element {
-  id: string
-  type: 'staticText' | 'text' | 'checkbox' | 'dropdown' | 'radio'
-  label: string
-  description: string
-  value: string
-  options: string[]
-  layout: 'full' | 'half'
-}
+import { Element, ElementType } from './types'
 
 export interface DocumentTemplate {
   id: string
@@ -55,47 +46,34 @@ interface DocumentBuilderContextType {
 const DocumentBuilderContext = createContext<DocumentBuilderContextType | undefined>(undefined)
 
 export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
-  const { user } = useUser()
   const [templates, setTemplates] = useState<DocumentTemplate[]>([])
   const [currentTemplate, setCurrentTemplate] = useState<DocumentTemplate | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const { user } = useUser()
 
   const fetchTemplates = useCallback(async () => {
-    if (!user?.id || !user?.organization_id) {
-      setIsLoading(false)
-      return
-    }
+    if (!user?.id) return
 
     try {
-      console.log('Fetching templates for organization:', user)
       setIsLoading(true)
-      const { data, error } = await supabase
-        .from('document_templates')
-        .select(`
-          id,
-          name,
-          description,
-          content,
-          tags,
-          version,
-          created_by,
-          last_updated_by,
-          organization_id,
-          is_active,
-          created_at,
-          updated_at
-        `)
-        .eq('organization_id', user.organization_id)
-        .is('deleted_at', null)
-        .order('updated_at', { ascending: false })
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
 
-      if (error) {
-        console.error('Error fetching templates:', error)
-        throw error
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
       }
 
-      console.log('Fetched templates:', data)
+      const { data, error } = await supabase
+        .from('document_templates')
+        .select('*')
+        .eq('organization_id', userData.organization_id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
       setTemplates(data || [])
     } catch (error) {
       console.error('Error fetching templates:', error)
@@ -105,9 +83,105 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  const loadTemplate = useCallback(async (id: string) => {
+    if (!user?.id) return
+
+    try {
+      setIsLoading(true)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
+      }
+
+      const { data, error } = await supabase
+        .from('document_templates')
+        .select('*')
+        .eq('id', id)
+        .eq('organization_id', userData.organization_id)
+        .single()
+
+      if (error) throw error
+      if (!data) throw new Error('Template not found')
+
+      setCurrentTemplate(data)
+      setHasUnsavedChanges(false)
+    } catch (error) {
+      console.error('Error loading template:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user])
+
+  const saveTemplate = useCallback(async (name: string, description: string, tags: string[]) => {
+    if (!user?.id || !currentTemplate) return
+
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!userData?.organization_id) {
+        throw new Error('No organization found for user')
+      }
+
+      const { error } = await supabase
+        .from('document_templates')
+        .upsert({
+          ...currentTemplate,
+          name,
+          description,
+          tags,
+          organization_id: userData.organization_id,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+      setHasUnsavedChanges(false)
+
+      // Update current template locally instead of fetching
+      setCurrentTemplate(prev => prev ? {
+        ...prev,
+        name,
+        description,
+        tags,
+        updated_at: new Date().toISOString()
+      } : null)
+
+    } catch (error) {
+      console.error('Error saving template:', error)
+      throw error
+    }
+  }, [currentTemplate, user])
+
   useEffect(() => {
-    fetchTemplates().catch(error => console.error('Error in useEffect:', error))
-  }, [fetchTemplates])
+    const autoSave = async () => {
+      if (
+        hasUnsavedChanges &&
+        currentTemplate &&
+        user?.id
+      ) {
+        try {
+          await saveTemplate(
+            currentTemplate.name,
+            currentTemplate.description,
+            currentTemplate.tags
+          )
+        } catch (error) {
+          console.error('Error auto-saving template:', error)
+        }
+      }
+    }
+
+    autoSave()
+  }, [hasUnsavedChanges, currentTemplate, user?.id, saveTemplate])
 
   const addElement = useCallback((element: Omit<Element, 'id'>) => {
     setCurrentTemplate(prevTemplate => {
@@ -162,83 +236,19 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
     setHasUnsavedChanges(true)
   }, [])
 
-  const saveTemplate = useCallback(async (name: string, description: string, tags: string[]) => {
-    if (!user?.id || !user?.organization_id || !supabase || !currentTemplate) {
-      throw new Error('Missing required data')
-    }
-
-    const updates = {
-      name,
-      description,
-      tags,
-      content: currentTemplate.content,
-      updated_at: new Date().toISOString(),
-      organization_id: user.organization_id
-    }
-
-    try {
-      const { error } = await supabase
-        .from('document_templates')
-        .upsert({
-          id: currentTemplate.id,
-          ...updates,
-          created_by: user.id,
-          created_at: currentTemplate.created_at || new Date().toISOString()
-        })
-
-      if (error) throw error
-
-      setCurrentTemplate(prev => prev ? { ...prev, ...updates } : null)
-      setHasUnsavedChanges(false)
-    } catch (error) {
-      console.error('Error saving template:', error)
-      throw error
-    }
-  }, [currentTemplate, user])
-
-  useEffect(() => {
-    const autoSave = async () => {
-      if (
-        hasUnsavedChanges &&
-        currentTemplate &&
-        user?.id
-      ) {
-        try {
-          await saveTemplate(
-            currentTemplate.name,
-            currentTemplate.description,
-            currentTemplate.tags
-          )
-        } catch (error) {
-          console.error('Error auto-saving template:', error)
-        }
-      }
-    }
-
-    autoSave()
-  }, [hasUnsavedChanges, currentTemplate, user?.id, saveTemplate])
-
-  const loadTemplate = useCallback(async (id: string) => {
-    if (!supabase) return
-
-    try {
-      const { data, error } = await supabase
-        .from('document_templates')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error) throw error
-      setCurrentTemplate(data)
-    } catch (error) {
-      console.error('Error loading template:', error)
-      throw error
-    }
-  }, [])
-
   const createNewTemplate = useCallback(async () => {
-    if (!user?.id || !user?.organization_id) {
+    if (!user?.id) {
       throw new Error('No user session')
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.organization_id) {
+      throw new Error('No organization found for user')
     }
 
     const newTemplate: DocumentTemplate = {
@@ -256,7 +266,7 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
 
     const { error } = await supabase
       .from('document_templates')
-      .insert([{ ...newTemplate, organization_id: user.organization_id }])
+      .insert([{ ...newTemplate, organization_id: userData.organization_id }])
 
     if (error) throw error
 
@@ -264,7 +274,7 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
     return newTemplate
   }, [user])
 
-  const contextValue: DocumentBuilderContextType = {
+  const value = {
     templates,
     currentTemplate,
     isLoading,
@@ -277,11 +287,11 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
     createNewTemplate,
     fetchTemplates,
     hasUnsavedChanges,
-    setHasUnsavedChanges,
+    setHasUnsavedChanges
   }
 
   return (
-    <DocumentBuilderContext.Provider value={contextValue}>
+    <DocumentBuilderContext.Provider value={value}>
       {children}
     </DocumentBuilderContext.Provider>
   )
@@ -289,7 +299,7 @@ export function DocumentBuilderProvider({ children }: { children: ReactNode }) {
 
 export function useDocumentBuilder() {
   const context = useContext(DocumentBuilderContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useDocumentBuilder must be used within a DocumentBuilderProvider')
   }
   return context

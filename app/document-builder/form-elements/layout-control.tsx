@@ -6,8 +6,8 @@ import { AlignJustify, AlignLeft } from 'lucide-react'
 import { Element } from '../types'
 
 interface LayoutControlProps {
-  layout: Element['layout'];
-  onChange: (layout: Element['layout']) => void;
+  layout: Element['layout']
+  onChange: (layout: Element['layout']) => void
 }
 
 export function LayoutControl({ layout, onChange }: LayoutControlProps) {
@@ -17,15 +17,19 @@ export function LayoutControl({ layout, onChange }: LayoutControlProps) {
         variant={layout === 'full' ? 'default' : 'outline'}
         size="sm"
         onClick={() => onChange('full')}
+        className="flex-1"
       >
-        <AlignJustify className="h-4 w-4" />
+        <AlignJustify className="h-4 w-4 mr-2" />
+        Full Width
       </Button>
       <Button
         variant={layout === 'half' ? 'default' : 'outline'}
         size="sm"
         onClick={() => onChange('half')}
+        className="flex-1"
       >
-        <AlignLeft className="h-4 w-4" />
+        <AlignLeft className="h-4 w-4 mr-2" />
+        Half Width
       </Button>
     </div>
   )
