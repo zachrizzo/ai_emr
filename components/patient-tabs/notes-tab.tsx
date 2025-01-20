@@ -767,7 +767,7 @@ export function NotesTab({
                                                     <PopoverContent
                                                         side="bottom"
                                                         align="start"
-                                                        sideOffset={600}
+                                                        sideOffset={400}
                                                         alignOffset={-300}
                                                         avoidCollisions={true}
                                                         className="p-0 border-none bg-transparent shadow-none"
