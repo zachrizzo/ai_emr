@@ -622,15 +622,30 @@ export function NotesTab({
         fetchAppointments(patientId)
     }
 
+    const handleDeleteNotes = async (noteIds: string[]) => {
+        try {
+            await Promise.all(noteIds.map(id => deleteClinicalNote(id)))
+            toast({
+                title: 'Success',
+                description: `${noteIds.length} note(s) deleted successfully.`,
+            })
+            await loadNotes() // Refresh the notes list
+        } catch (error) {
+            console.error('Error deleting notes:', error)
+            toast({
+                title: 'Error',
+                description: 'Failed to delete notes. Please try again.',
+                variant: 'destructive',
+            })
+        }
+    }
+
     const sections: Array<NoteSection> = ['subjective', 'objective', 'assessment', 'plan']
 
     return (
         <div className="flex h-[calc(100vh-200px)]">
             {/* Main Content */}
-            <div className={cn(
-                "flex-grow space-y-4 overflow-y-auto p-4 transition-all duration-300",
-                showPreviousNotes ? "mr-8" : "mr-0"
-            )}>
+            <div className="flex-grow space-y-4 overflow-y-auto p-4">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Session Notes</h2>
                 </div>
@@ -653,6 +668,7 @@ export function NotesTab({
                             <SessionNotesHistoryGrid
                                 notes={notes}
                                 onSelectNote={handleNoteSelection}
+                                onDeleteNotes={handleDeleteNotes}
                             />
                         )}
                     </>
